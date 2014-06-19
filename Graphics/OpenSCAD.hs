@@ -72,15 +72,54 @@ import Data.Colour.SRGB (channelRed, channelBlue, channelGreen, toSRGB)
 import System.FilePath (FilePath)
 import Data.Colour.Names as Colours
 
+-- A vector in 2 or 3-space.
+class Vector a
+
+-- | A 'Model' is an object that can have be either 2d or 3d. This class
+-- provides methods for creating them.
+class Model a where
+  -- | Create a rectangular 'Model' with @rectangle /x-size y-size/@.
+  rectangle :: Float -> Float -> a
+  -- | 'square' is a 'rectangle' with both sides the same size.
+  square :: Float -> a
+  square s = rectangle s s
+  -- | Create a circular 'Model' with @circle /radius/ 'Facet'@.
+  circle :: Float -> Facet -> a
+  -- | Project a 'Solid' into a 'Model' with @projection /cut 'Solid'/@.
+  projection :: Bool -> Solid -> a
+  -- | __UNTESTED__ 'importFile' is @import /filename/@.
+  importFile :: FilePath -> a
+
+-- | A 'Transform' turns a 'Model' into another 'Model' using a vector
+-- with the appropriate number of dimensions.
+class (Model m, Vector v) => Transform m v | m -> v where
+  -- | Scale a 'Model', the vector specifying the scale factor for each axis.
+  scale :: v -> m -> m
+  -- | __UNTESTED__ Resize a 'Model' to occupy the dimensions given by
+  -- the vector.
+  resize :: v -> m -> m
+  -- | Rotate a 'Model' by different amounts around each of the three axis.
+  rotate :: v -> m -> m
+  -- | Translate a 'Model' along a 'Vector'.
+  translate :: v -> m -> m
+  -- | Mirror a 'Model' across a plane intersecting the origin.
+  mirror :: v -> m -> m
+  -- | Render a 'Model' in a specific color. This doesn't us the
+  -- OpenSCAD color model, but instead uses the 'Data.Colour' model. The
+  -- 'Graphics.OpenSCAD' module rexports 'Data.Colour.Names' so you can
+  -- conveniently say @'color' 'red' /'Solid'/@.
+  color :: Colour Float -> m -> m
+  -- | Render a 'Solid' in a transparent color. This uses the
+  -- 'Data.Coulor.AphaColour' color model.
+  transparent :: AlphaColour Float -> m -> m
+
 -- | 'Vector2d' is used where OpenSCAD expects an OpenSCAD @vector@ of length 2.
 type Vector2d = (Float, Float)
+instance Vector Vector2d
+
 -- | 'Vector3d' is used where OpenSCAD expects an OpenSCAD @vector@ of length 3.
 type Vector3d = (Float, Float, Float)
-
-class Vector a
-instance Vector Vector2d
 instance Vector Vector3d
-
 
 -- | These are for @Poly*s@, which don't work yet.
 type Path = [Int]
@@ -122,6 +161,22 @@ data Shape =
            | Transparent2d (AlphaColour Float) Shape
            deriving Show
 
+instance Model Shape where
+  rectangle w d = Rectangle w d
+  circle = Circle
+  projection = Projection
+  importFile = Import2d
+
+instance Transform Shape Vector2d where 
+  scale = Scale2d
+  resize = Resize2d
+  rotate = Rotate2d
+  translate = Translate2d
+  mirror = Mirror2d
+  color = Color2d
+  transparent = Transparent2d
+
+
 -- | A 'Solid' is a solid object in OpenSCAD. Since we don't have
 -- optional or named objects, some constructors appear twice to allow
 -- two different variants to be used. And of course, they all have all
@@ -154,55 +209,11 @@ data Solid = Sphere Float Facet
            | Var Facet [Solid]
            deriving Show
 
--- | A 'Model' is an object that can have be either 2d or 3d. This class
--- provides methods for creating them.
-class Model a where
-  -- | Create a rectangular 'Model' with @rectangle /x-size y-size/@.
-  rectangle :: Float -> Float -> a
-  -- | 'square' is a 'rectangle' with both sides the same size.
-  square :: Float -> a
-  square s = rectangle s s
-  -- | Create a circular 'Model' with @circle /radius/ 'Facet'@.
-  circle :: Float -> Facet -> a
-  -- | Project a 'Solid' into a 'Model' with @projection /cut 'Solid'/@.
-  projection :: Bool -> Solid -> a
-  -- | __UNTESTED__ 'importFile' is @import /filename/@.
-  importFile :: FilePath -> a
-
 instance Model Solid where
   rectangle w d = Shape $ Rectangle w d
   circle r f = Shape $ Circle r f
   projection c s = Shape $ Projection c s
   importFile = Import3d
-
-instance Model Shape where
-  rectangle w d = Rectangle w d
-  circle = Circle
-  projection = Projection
-  importFile = Import2d
-
--- | A 'Transform' turns a 'Model' into another 'Model' using a vector
--- with the appropriate number of dimensions.
-class (Model m, Vector v) => Transform m v | m -> v where
-  -- | Scale a 'Model', the vector specifying the scale factor for each axis.
-  scale :: v -> m -> m
-  -- | __UNTESTED__ Resize a 'Model' to occupy the dimensions given by
-  -- the vector.
-  resize :: v -> m -> m
-  -- | Rotate a 'Model' by different amounts around each of the three axis.
-  rotate :: v -> m -> m
-  -- | Translate a 'Model' along a 'Vector'.
-  translate :: v -> m -> m
-  -- | Mirror a 'Model' across a plane intersecting the origin.
-  mirror :: v -> m -> m
-  -- | Render a 'Model' in a specific color. This doesn't us the
-  -- OpenSCAD color model, but instead uses the 'Data.Colour' model. The
-  -- 'Graphics.OpenSCAD' module rexports 'Data.Colour.Names' so you can
-  -- conveniently say @'color' 'red' /'Solid'/@.
-  color :: Colour Float -> m -> m
-  -- | Render a 'Solid' in a transparent color. This uses the
-  -- 'Data.Coulor.AphaColour' color model.
-  transparent :: AlphaColour Float -> m -> m
 
 instance Transform Solid Vector3d where 
   scale = Scale
@@ -213,14 +224,6 @@ instance Transform Solid Vector3d where
   color = Color
   transparent = Transparent
 
-instance Transform Shape Vector2d where 
-  scale = Scale2d
-  resize = Resize2d
-  rotate = Rotate2d
-  translate = Translate2d
-  mirror = Mirror2d
-  color = Color2d
-  transparent = Transparent2d
 
 -- | 'render' does all the real work. It will walk the AST for a 'Solid',
 -- returning an OpenSCAD program in a 'String'.
