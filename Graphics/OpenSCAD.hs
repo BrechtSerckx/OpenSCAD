@@ -55,11 +55,11 @@ module Graphics.OpenSCAD (
   -- * Constructors
   sphere, box, cube, cylinder, obCylinder, importFile, linearExtrude,
   rotateExtrude, rectangle, square, circle, projection,
- -- * Combinations of 'Solid's
+ -- * Combinations
   union, intersection, difference, minkowski, hull,
   -- * Transformations
   scale, resize, rotate, translate, mirror, multMatrix, color, transparent, up,
-  -- ** General convenience functions
+  -- * General convenience functions
   diam, draw, drawL,
   -- * Convenience functions for 'Facet's.
   var, fn, fs, fa, def,
