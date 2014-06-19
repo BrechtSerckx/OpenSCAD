@@ -17,6 +17,10 @@ Standard usage is to have a @main@ function that looks like:
 @
 main = draw $ /Solid/
 @
+or
+@
+main = drawL $ [/Solid/]
+@
 
 and then set your IDE's compile command to use @runhaskell@ or
 equivalent to run your code and send the output to a .scad file. Open
@@ -41,13 +45,11 @@ the OpenSCAD documentation for usage information.
 
 module Graphics.OpenSCAD (
   -- * Basic data types
-  Solid,
-  Shape,
-  Facet,
+  Solid, Shape, Facet,
   -- * Type aliases to save typing
   Vector, Point,
   -- * Rendering functions
-  render, draw,
+  render, renderL,
   -- * Constructors
   -- ** 'Solid's
   sphere, box, cube, cylinder, obCylinder, rectangle3d, square3d, circle3d,
@@ -63,7 +65,7 @@ module Graphics.OpenSCAD (
   -- ** 'Shape's
   scale2d, resize2d, rotate2d, translate2d, mirror2d,
   -- ** General convenience functions
-  diam,
+  diam, draw, drawL,
   -- * Convenience functions for 'Facet's.
   var, fn, fs, fa, def,
   module Colours)
@@ -204,10 +206,20 @@ render (Var (Fa f) ss) = rList ("assign($fa=" ++ show f ++ ")") ss
 render (Var (Fs f) ss) = rList ("assign($fs=" ++ show f ++ ")") ss
 render (Var (Fn n) ss) = rList ("assign($fn=" ++ show n ++ ")") ss
 
--- | 'draw' is a convenience function to write the rendered 'Solid' to
+-- | A convenience function to render a list of 'Solid's by taking
+-- their union.
+renderL :: [Solid] -> String
+renderL = render . Union
+
+-- | A convenience function to write the rendered 'Solid' to
 -- standard output.
+draw :: Solid -> IO ()
 draw = putStrLn . render
 
+-- | A convenience function to write a 'union' of 'Solid's to
+-- standard output.
+drawL :: [Solid] -> IO ()
+drawL = draw . Union
 
 -- utilities for rendering Shapes.
 rShape (Rectangle r f) = "square([" ++ show r ++ "," ++ show f ++ "]);\n\n"
