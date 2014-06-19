@@ -48,7 +48,7 @@ the OpenSCAD documentation for usage information.
 module Graphics.OpenSCAD (
   -- * Basic data types
   Solid, Shape, Facet,
-  -- * Type aliases for vectors
+  -- * Type aliases for vectors, should you want them
   Vector2d, Vector3d,
   -- * Rendering functions
   render, renderL,
@@ -73,7 +73,8 @@ import System.FilePath (FilePath)
 import Data.Colour.Names as Colours
 
 -- A vector in 2 or 3-space.
-class Vector a
+class Vector a where
+  rVector :: a -> String
 
 -- | A 'Model' is an object that can have be either 2d or 3d. This class
 -- provides methods for creating them.
@@ -89,9 +90,11 @@ class Model a where
   projection :: Bool -> Solid -> a
   -- | __UNTESTED__ 'importFile' is @import /filename/@.
   importFile :: FilePath -> a
+  -- Internal rendering of a Model.
+  rModel :: a -> String
 
--- | A 'Transform' turns a 'Model' into another 'Model' using a vector
--- with the appropriate number of dimensions.
+-- | A 'Transform' turns a 'Model' into another 'Model', usually using
+-- a vector with the appropriate number of dimensions.
 class (Model m, Vector v) => Transform m v | m -> v where
   -- | Scale a 'Model', the vector specifying the scale factor for each axis.
   scale :: v -> m -> m
@@ -115,17 +118,19 @@ class (Model m, Vector v) => Transform m v | m -> v where
 
 -- | 'Vector2d' is used where OpenSCAD expects an OpenSCAD @vector@ of length 2.
 type Vector2d = (Float, Float)
-instance Vector Vector2d
+instance Vector Vector2d where
+  rVector (x, y) = "[" ++ show x ++ "," ++ show y ++ "]"
 
 -- | 'Vector3d' is used where OpenSCAD expects an OpenSCAD @vector@ of length 3.
 type Vector3d = (Float, Float, Float)
-instance Vector Vector3d
+instance Vector Vector3d where
+  rVector (a, b, c) = "[" ++ show a ++ "," ++ show b ++ "," ++ show c ++ "]"
 
--- | These are for @Poly*s@, which don't work yet.
+-- These are for @Poly*s@, which don't work yet.
 type Path = [Int]
 type Face = (Int, Int, Int)
 
--- | a 4x4 transformation matrix specifying a complete 3-space transform. 
+-- a 4x4 transformation matrix specifying a complete 3-space transform. 
 type TransMatrix = ((Float, Float, Float, Float), (Float, Float, Float, Float),
                     (Float, Float, Float, Float), (Float, Float, Float, Float))
 
@@ -149,8 +154,8 @@ data Shape =
              Rectangle Float Float
            | Circle Float Facet
            -- add | Polygon [Vector2d] [Path] Int
-           | Import2d FilePath
            | Projection Bool Solid
+           | Import2d FilePath
            -- 2d versions of the transformations
            | Scale2d Vector2d Shape
            | Resize2d Vector2d Shape
@@ -166,6 +171,7 @@ instance Model Shape where
   circle = Circle
   projection = Projection
   importFile = Import2d
+  rModel = rShape
 
 instance Transform Shape Vector2d where 
   scale = Scale2d
@@ -214,6 +220,7 @@ instance Model Solid where
   circle r f = Shape $ Circle r f
   projection c s = Shape $ Projection c s
   importFile = Import3d
+  rModel = render
 
 instance Transform Solid Vector3d where 
   scale = Scale
@@ -237,35 +244,35 @@ render (ObCylinder r1 h r2 f) =
     "cylinder(r1=" ++ show r1 ++ ",h=" ++ show h ++ ",r2=" ++ show r2 ++ rFacet f
     ++ ");\n\n"
 render (Import3d f) = "import(" ++ f ++");\n\n"
-render (Shape s) = rShape s
+render (Shape s) = rModel s
 render (Union ss) = rList "union()" ss
 render (Intersection ss) = rList "intersection()" ss
-render (Difference s1 s2) = "difference(){" ++ render s1 ++ render s2 ++ "}\n\n"
+render (Difference s1 s2) = "difference(){" ++ rModel s1 ++ rModel s2 ++ "}\n\n"
 render (Minkowski ss) = rList "minkowski()" ss
 render (Hull ss) = rList "hull()" ss
 render (Scale v s) = rVecSolid "scale" v s
 render (Resize v s) = rVecSolid "resize" v s
 render (Translate v s) = rVecSolid "translate" v s
-render (Rotate v s) = "rotate(" ++ rVector3d v ++ ")" ++ render s
+render (Rotate v s) = "rotate(" ++ rVector v ++ ")" ++ rModel s
 render (Mirror v s) = rVecSolid "mirror" v s
 render (MultMatrix (a, b, c, d) s) =
     "multmatrix([" ++ rQuad a ++ "," ++ rQuad b ++ "," ++ rQuad c ++ ","
-    ++ rQuad d ++"])\n" ++ render s
+    ++ rQuad d ++"])\n" ++ rModel s
 render (Color c s) = let r = toSRGB c in
-    "color(" ++ rVector3d (channelRed r, channelGreen r, channelBlue r) ++ ")\n"
-    ++ render s
+    "color(" ++ rVector (channelRed r, channelGreen r, channelBlue r) ++ ")\n"
+    ++ rModel s
 render (Transparent c s) =
     "color(" ++ rQuad (channelRed r, channelGreen r, channelBlue r, a) ++ ")"
-    ++ render s
+    ++ rModel s
     where r = toSRGB $ toPure c
           a = alphaChannel c
           toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
 render (LinearExtrude h t sc sl c f sh) =
     "linear_extrude(height=" ++ show h ++ ",twist=" ++ show t ++ ",scale="
-    ++ rVector2d sc ++ ",slices=" ++ show sl ++ ",convexity=" ++ show c
-    ++ rFacet f ++ ")" ++ rShape sh
+    ++ rVector sc ++ ",slices=" ++ show sl ++ ",convexity=" ++ show c
+    ++ rFacet f ++ ")" ++ rModel sh
 render (RotateExtrude c f sh) =
-  "rotate_extrude(convexity=" ++ show c ++ rFacet f ++ ")" ++ rShape sh
+  "rotate_extrude(convexity=" ++ show c ++ rFacet f ++ ")" ++ rModel sh
 render (Var (Fa f) ss) = rList ("assign($fa=" ++ show f ++ ")") ss
 render (Var (Fs f) ss) = rList ("assign($fs=" ++ show f ++ ")") ss
 render (Var (Fn n) ss) = rList ("assign($fn=" ++ show n ++ ")") ss
@@ -290,33 +297,31 @@ rShape (Rectangle r f) = "square([" ++ show r ++ "," ++ show f ++ "]);\n\n"
 rShape (Circle r f) = "circle(" ++ show r ++ rFacet f ++ ");\n\n"
 rShape (Import2d f) = "import(" ++ f ++ ");\n\n"
 rShape (Projection c s) =
-  "projection(cut=" ++ (if c then "true)" else "false)") ++ render s
-rShape (Scale2d p s) = "scale(" ++ rVector2d p ++ ")" ++ rShape s
-rShape (Resize2d p s) = "resize(" ++ rVector2d p ++ ")" ++ rShape s
-rShape (Rotate2d p s) = "rotate(" ++ rVector2d p ++ ")" ++ rShape s
-rShape (Translate2d p s) = "translate(" ++ rVector2d p ++ ")" ++ rShape s
-rShape (Mirror2d p s) = "mirror(" ++ rVector2d p ++ ")" ++ rShape s
+  "projection(cut=" ++ (if c then "true)" else "false)") ++ rModel s
+rShape (Scale2d p s) = "scale(" ++ rVector p ++ ")" ++ rModel s
+rShape (Resize2d p s) = "resize(" ++ rVector p ++ ")" ++ rModel s
+rShape (Rotate2d p s) = "rotate(" ++ rVector p ++ ")" ++ rModel s
+rShape (Translate2d p s) = "translate(" ++ rVector p ++ ")" ++ rModel s
+rShape (Mirror2d p s) = "mirror(" ++ rVector p ++ ")" ++ rModel s
 rShape (Color2d c s) = let r = toSRGB c in
-    "color(" ++ rVector3d (channelRed r, channelGreen r, channelBlue r) ++ ")\n"
-    ++ rShape s
+    "color(" ++ rVector (channelRed r, channelGreen r, channelBlue r) ++ ")\n"
+    ++ rModel s
 rShape (Transparent2d c s) =
     "color(" ++ rQuad (channelRed r, channelGreen r, channelBlue r, a) ++ ")"
-    ++ rShape s
+    ++ rModel s
     where r = toSRGB $ toPure c
           a = alphaChannel c
           toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
 
 
 -- And some misc. rendering utilities.
-rList n ss = n ++ "{\n" ++  concatMap render ss ++ "}"
-rSolid n s = n ++ "()\n" ++ render s
-rVector3d (a, b, c) = "[" ++ show a ++ "," ++ show b ++ "," ++ show c ++ "]"
-rVecSolid n v s = n ++ "(" ++ rVector3d v ++ ")\n" ++ render s
+rList n ss = n ++ "{\n" ++  concatMap rModel ss ++ "}"
+rSolid n s = n ++ "()\n" ++ rModel s
+rVecSolid n v s = n ++ "(" ++ rVector v ++ ")\n" ++ rModel s
 rQuad (w, x, y, z) =
   "[" ++ show w ++ "," ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]"
 rFacet Def = ""
 rFacet f = "," ++ showFacet f
-rVector2d (x, y)  = "[" ++ show x ++ "," ++ show y ++ "]"
 
 -- render a facet setting.
 showFacet :: Facet -> String
@@ -346,6 +351,7 @@ cylinder = Cylinder
 -- 'Facet'/@
 obCylinder :: Float -> Float -> Float -> Facet -> Solid
 obCylinder = ObCylinder
+
 
 -- Transformations
 -- | Create the union of a list of 'Solid's.
@@ -377,6 +383,7 @@ up :: Float -> Solid -> Solid
 up f = Translate (0, 0, f)
 
 
+-- Tools to add a dimensions.
 -- | Turn a 'Shape' into a 'Solid' exactly as is.
 solid :: Shape -> Solid
 solid = Shape
@@ -397,12 +404,7 @@ linearExtrude = LinearExtrude
 rotateExtrude ::  Int -> Facet -> Shape -> Solid
 rotateExtrude = RotateExtrude
 
--- | Use 'diam' to turn a diameter into a radius for circles, spheres, etc.
-diam :: Float -> Float
-diam = (/ 2)
-
 -- Convenience functions for Facets.
-
 -- Maybe this should have type [Facet] -> [Solid] -> [Solid]
 -- | 'var' uses @assign@ to set a special variable for the 'Solid's.
 var :: Facet -> [Solid] -> Solid
@@ -424,3 +426,9 @@ fn = Fn
 -- any of the values.
 def :: Facet
 def = Def
+
+-- And one last tool.
+-- | Use 'diam' to turn a diameter into a radius for circles, spheres, etc.
+diam :: Float -> Float
+diam = (/ 2)
+
