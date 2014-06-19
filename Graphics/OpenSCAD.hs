@@ -193,7 +193,7 @@ data Solid = Sphere Float Facet
            | ObCylinder Float Float Float Facet
            -- add | Polyhedron [Vector3d] [Face] Int
            | Import3d FilePath
-           | Shape Shape
+           | Solid Shape
            -- Combinations
            | Union [Solid]
            | Intersection [Solid]
@@ -216,9 +216,9 @@ data Solid = Sphere Float Facet
            deriving Show
 
 instance Model Solid where
-  rectangle w d = Shape $ Rectangle w d
-  circle r f = Shape $ Circle r f
-  projection c s = Shape $ Projection c s
+  rectangle w d = Solid $ Rectangle w d
+  circle r f = Solid $ Circle r f
+  projection c s = Solid $ Projection c s
   importFile = Import3d
   rModel = render
 
@@ -244,7 +244,7 @@ render (ObCylinder r1 h r2 f) =
     "cylinder(r1=" ++ show r1 ++ ",h=" ++ show h ++ ",r2=" ++ show r2 ++ rFacet f
     ++ ");\n\n"
 render (Import3d f) = "import(" ++ f ++");\n\n"
-render (Shape s) = rModel s
+render (Solid s) = rModel s
 render (Union ss) = rList "union()" ss
 render (Intersection ss) = rList "intersection()" ss
 render (Difference s1 s2) = "difference(){" ++ rModel s1 ++ rModel s2 ++ "}\n\n"
@@ -386,7 +386,7 @@ up f = Translate (0, 0, f)
 -- Tools to add a dimensions.
 -- | Turn a 'Shape' into a 'Solid' exactly as is.
 solid :: Shape -> Solid
-solid = Shape
+solid = Solid
 
 -- | Extrude a 'Shape' along a line with @linear_extrude@.
 linearExtrude :: Float         -- ^ height
