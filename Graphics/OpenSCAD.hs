@@ -115,6 +115,17 @@ class (Model m, Vector v) => Transform m v | m -> v where
   -- | Render a 'Solid' in a transparent color. This uses the
   -- 'Data.Coulor.AphaColour' color model.
   transparent :: AlphaColour Float -> m -> m
+  -- | Create the union of a list of 'Solid's.
+  union :: [m] -> m
+  -- | Create the intersection of a list of 'Models's.
+  intersection :: [m] -> m
+  -- | The difference between two 'Model's.
+  difference :: m -> m -> m
+  -- | The Minkowski sum of a list of 'Solid's.
+  minkowski :: [m] -> m
+  -- | The convex hull of a list of 'Solid's.
+  hull :: [m] -> m
+
 
 -- | 'Vector2d' is used where OpenSCAD expects an OpenSCAD @vector@ of length 2.
 type Vector2d = (Float, Float)
@@ -164,6 +175,12 @@ data Shape =
            | Mirror2d Vector2d Shape
            | Color2d (Colour Float) Shape
            | Transparent2d (AlphaColour Float) Shape
+           -- and the combinations
+           | Union2d [Shape]
+           | Intersection2d [Shape]
+           | Difference2d Shape Shape
+           | Minkowski2d [Shape]
+           | Hull2d [Shape]
            deriving Show
 
 instance Model Shape where
@@ -181,6 +198,11 @@ instance Transform Shape Vector2d where
   mirror = Mirror2d
   color = Color2d
   transparent = Transparent2d
+  union = Union2d
+  intersection = Intersection2d
+  difference = Difference2d
+  minkowski = Minkowski2d
+  hull = Hull2d
 
 
 -- | A 'Solid' is a solid object in OpenSCAD. Since we don't have
@@ -230,6 +252,11 @@ instance Transform Solid Vector3d where
   mirror = Mirror
   color = Color
   transparent = Transparent
+  union = Union
+  intersection = Intersection
+  difference = Difference
+  minkowski = Minkowski
+  hull = Hull
 
 
 -- | 'render' does all the real work. It will walk the AST for a 'Solid',
@@ -280,7 +307,7 @@ render (Var (Fn n) ss) = rList ("assign($fn=" ++ show n ++ ")") ss
 -- | A convenience function to render a list of 'Solid's by taking
 -- their union.
 renderL :: [Solid] -> String
-renderL = render . Union
+renderL = render . union
 
 -- | A convenience function to write the rendered 'Solid' to
 -- standard output.
@@ -351,28 +378,6 @@ cylinder = Cylinder
 -- 'Facet'/@
 obCylinder :: Float -> Float -> Float -> Facet -> Solid
 obCylinder = ObCylinder
-
-
--- Transformations
--- | Create the union of a list of 'Solid's.
-union :: [Solid] -> Solid
-union = Union
-
--- | Create the intersection of a list of 'Solid's.
-intersection :: [Solid] -> Solid
-intersection = Intersection
-
--- | The difference between two 'Solid's.
-difference :: Solid -> Solid -> Solid
-difference = Difference
-
--- | The Minkowski sum of a list of 'Solid's.
-minkowski :: [Solid] -> Solid
-minkowski = Minkowski
-
--- | The convex hull of a list of 'Solid's.
-hull :: [Solid] -> Solid
-hull = Hull
 
 -- | Transform a 'Solid' with a 'TransMatrix'
 multMatrix :: TransMatrix -> Solid -> Solid
