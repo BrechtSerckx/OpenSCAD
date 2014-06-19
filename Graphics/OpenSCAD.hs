@@ -73,7 +73,7 @@ where
 import Data.Colour (Colour, AlphaColour, alphaChannel, darken, over, black)
 import Data.Colour.SRGB (channelRed, channelBlue, channelGreen, toSRGB)
 import System.FilePath (FilePath)
-import qualified Data.Colour.Names as Colours
+import Data.Colour.Names as Colours
 
 -- | 'Vector' is used where OpenSCAD expects an OpenSCAD @vector@ of length 3.
 type Vector = (Float, Float, Float)

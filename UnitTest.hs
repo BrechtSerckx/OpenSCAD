@@ -6,7 +6,6 @@ import Test.Framework
 import Test.Framework.Providers.HUnit
 
 import Graphics.OpenSCAD
-import Data.Colour.Names
 import Data.Colour (withOpacity)
 
 sw = concat . words
