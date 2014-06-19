@@ -29,14 +29,14 @@ main = defaultMainWithOpts [
      (obCylinder 1 2 2 $ fn 10),
   st "obCylinder 4" "cylinder(r1=1.0,h=2.0,r2=2.0,$fa=30.0);"
      (obCylinder 1 2  2 $ fa 30),
-  -- polyhedron & import3D goes here
+  -- polyhedron & 3d import goes here
   st "rectangle"    "square([2.0,3.0]);"              (rectangle 2 3),
   st "square"       "square([2.0,2.0]);"              (square 2),
   st "circle 1"     "circle(1.0);"                    (circle 1 def),
   st "circle 2"     "circle(2.0,$fn=100);"            (circle 2 $ fn 100),
   st "circle 3"     "circle(2.0,$fa=5.0);"            (circle 2 $ fa 5),
   st "circle 4"     "circle(2.0,$fs=0.1);"            (circle 2 $ fs 0.1),
-  -- polygon & import2D goes here
+  -- polygon & 2d import goes here
   st "projection"   "projection(cut=false)scale([10.0,10.0,10.0])difference(){translate([0.0,0.0,1.0])cube([1.0,1.0,1.0]);translate([0.25,0.25,0.0])cube([0.5,0.5,3.0]);}"
      (projection False $ scale (10, 10, 10) $ difference (up 1 (cube 1)) $ translate (0.25, 0.25, 0) (box 0.5 0.5 3)),
   -- Transformations
@@ -68,29 +68,29 @@ main = defaultMainWithOpts [
      (linearExtrude 10 0 (1, 1) 10 10 def $ circle 1 def),
   st "linearExtrude 2"
      "linear_extrude(height=10.0,twist=100.0,scale=[1.0,1.0],slices=10,convexity=10)translate([2.0,0.0])circle(1.0);"
-     (linearExtrude 10 100 (1, 1) 10 10 def $ translate2d (2, 0) $ circle 1 def),
+     (linearExtrude 10 100 (1, 1) 10 10 def $ translate (2, 0) $ circle 1 def),
   st "linearExtrude 3"
      "linear_extrude(height=10.0,twist=500.0,scale=[1.0,1.0],slices=10,convexity=10)translate([2.0,0.0])circle(1.0);"
-     (linearExtrude 10 500 (1, 1) 10 10 def $ translate2d (2, 0) $ circle 1 def),
+     (linearExtrude 10 500 (1, 1) 10 10 def $ translate (2, 0) $ circle 1 def),
   st "linearExtrude 4"
      "linear_extrude(height=10.0,twist=360.0,scale=[1.0,1.0],slices=100,convexity=10)translate([2.0,0.0])circle(1.0);"
-     (linearExtrude 10 360 (1, 1) 100 10 def $ translate2d (2, 0) $ circle 1 def),
+     (linearExtrude 10 360 (1, 1) 100 10 def $ translate (2, 0) $ circle 1 def),
   st "linearExtrude 5"
      "linear_extrude(height=10.0,twist=360.0,scale=[1.0,1.0],slices=100,convexity=10,$fn=100)translate([2.0,0.0])circle(1.0);"
-     (linearExtrude 10 360 (1, 1) 100 10 (fn 100) $ translate2d (2, 0) $ circle 1 def),
+     (linearExtrude 10 360 (1, 1) 100 10 (fn 100) $ translate (2, 0) $ circle 1 def),
   st "linearExtrude 6"
      "linear_extrude(height=10.0,twist=0.0,scale=[3.0,3.0],slices=100,convexity=10)translate([2.0,0.0])circle(1.0);"
-     (linearExtrude 10 0 (3, 3) 100 10 def $ translate2d (2, 0) $ circle 1 def),
+     (linearExtrude 10 0 (3, 3) 100 10 def $ translate (2, 0) $ circle 1 def),
   st "linearExtrude 7"
      "linear_extrude(height=10.0,twist=0.0,scale=[1.0,5.0],slices=100,convexity=10,$fn=100)translate([2.0,0.0])circle(1.0);"
-     (linearExtrude 10 0 (1, 5) 100 10 (fn 100) $ translate2d (2, 0)
+     (linearExtrude 10 0 (1, 5) 100 10 (fn 100) $ translate (2, 0)
       $ circle 1 def),
   st "rotate_extrude 1"
      "rotate_extrude(convexity=10)translate([2.0,0.0])circle(1.0);"
-     (rotateExtrude 10 def $ translate2d (2, 0) $ circle 1 def),
+     (rotateExtrude 10 def $ translate (2, 0) $ circle 1 def),
   st "rotate_extrude 2"
      "rotate_extrude(convexity=10,$fn=100)translate([2.0,0.0])circle(1.0,$fn=100);"
-     (rotateExtrude 10 (fn 100) $ translate2d (2, 0) $ circle 1 $ fn 100),
+     (rotateExtrude 10 (fn 100) $ translate (2, 0) $ circle 1 $ fn 100),
   st "facet 1" "assign($fn=100){sphere(2.0,$fn=100);}"
      (var (fn 100) [sphere 2 $ fn 100]),
   st "facet 2" "assign($fa=5.0){sphere(2.0,$fa=5.0);}"

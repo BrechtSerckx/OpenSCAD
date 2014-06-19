@@ -1,5 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, FunctionalDependencies #-}
 
 {- |
 Module      : Graphics.OpenSCAD
@@ -49,8 +48,8 @@ the OpenSCAD documentation for usage information.
 module Graphics.OpenSCAD (
   -- * Basic data types
   Solid, Shape, Facet,
-  -- * Type aliases to save typing
-  Vector, Point,
+  -- * Type aliases for vectors
+  Vector2d, Vector3d,
   -- * Rendering functions
   render, renderL,
   -- * Constructors
@@ -59,10 +58,7 @@ module Graphics.OpenSCAD (
  -- * Combinations of 'Solid's
   union, intersection, difference, minkowski, hull,
   -- * Transformations
-  -- ** 'Solid's
   scale, resize, rotate, translate, mirror, multMatrix, color, transparent, up,
-  -- ** 'Shape's
-  scale2d, resize2d, rotate2d, translate2d, mirror2d,
   -- ** General convenience functions
   diam, draw, drawL,
   -- * Convenience functions for 'Facet's.
@@ -76,18 +72,23 @@ import Data.Colour.SRGB (channelRed, channelBlue, channelGreen, toSRGB)
 import System.FilePath (FilePath)
 import Data.Colour.Names as Colours
 
--- | 'Vector' is used where OpenSCAD expects an OpenSCAD @vector@ of length 3.
-type Vector = (Float, Float, Float)
+-- | 'Vector2d' is used where OpenSCAD expects an OpenSCAD @vector@ of length 2.
+type Vector2d = (Float, Float)
+-- | 'Vector3d' is used where OpenSCAD expects an OpenSCAD @vector@ of length 3.
+type Vector3d = (Float, Float, Float)
 
--- | 'Point' is used where OpenSCAD expects an OpenSCAD @vector@ of length 3.
-type Point = (Float, Float)
+class Vector a
+instance Vector Vector2d
+instance Vector Vector3d
+
 
 -- | These are for @Poly*s@, which don't work yet.
 type Path = [Int]
 type Face = (Int, Int, Int)
 
-type Transform = ((Float, Float, Float, Float), (Float, Float, Float, Float),
-                  (Float, Float, Float, Float), (Float, Float, Float, Float))
+-- | a 4x4 transformation matrix specifying a complete 3-space transform. 
+type TransMatrix = ((Float, Float, Float, Float), (Float, Float, Float, Float),
+                    (Float, Float, Float, Float), (Float, Float, Float, Float))
 
 
 -- While it's tempting to add more options to Solid, don't do it. Instead,
@@ -108,15 +109,15 @@ data Facet = Fa Float | Fs Float | Fn Int | Def deriving Show
 data Shape =
              Rectangle Float Float
            | Circle Float Facet
-           -- add | Polygon [Point] [Path] Int
+           -- add | Polygon [Vector2d] [Path] Int
            | Import2d FilePath
            | Projection Bool Solid
            -- 2d versions of the transformations
-           | Scale2d Point Shape
-           | Resize2d Point Shape
-           | Rotate2d Point Shape
-           | Translate2d Point Shape
-           | Mirror2d Point Shape
+           | Scale2d Vector2d Shape
+           | Resize2d Vector2d Shape
+           | Rotate2d Vector2d Shape
+           | Translate2d Vector2d Shape
+           | Mirror2d Vector2d Shape
            deriving Show
 
 -- | A 'Solid' is a solid object in OpenSCAD. Since we don't have
@@ -128,7 +129,7 @@ data Solid =
            | Box Float Float Float
            | Cylinder Float Float Facet
            | ObCylinder Float Float Float Facet
-           -- add | Polyhedron [Vector] [Face] Int
+           -- add | Polyhedron [Vector3d] [Face] Int
            | Import3d FilePath
            | Shape Shape
            -- Combinations
@@ -138,15 +139,15 @@ data Solid =
            | Minkowski [Solid]
            | Hull [Solid]
            -- Transformations
-           | Scale Vector Solid
-           | Resize Vector Solid
-           | Rotate Vector Solid
-           | Translate Vector Solid
-           | Mirror Vector Solid
-           | MultMatrix Transform Solid
+           | Scale Vector3d Solid
+           | Resize Vector3d Solid
+           | Rotate Vector3d Solid
+           | Translate Vector3d Solid
+           | Mirror Vector3d Solid
+           | MultMatrix TransMatrix Solid
            | Color (Colour Float) Solid
            | Transparent (AlphaColour Float) Solid
-           | LinearExtrude Float Float Point Int Int Facet Shape
+           | LinearExtrude Float Float Vector2d Int Int Facet Shape
            | RotateExtrude Int Facet Shape
            -- Mesh control
            | Var Facet [Solid]
@@ -179,6 +180,34 @@ instance Model Shape where
   projection = Projection
   importFile = Import2d
 
+-- | A 'Transform' turns a 'Model' into another 'Model' using a vector
+-- with the appropriate number of dimensions.
+class (Model m, Vector v) => Transform m v | m -> v where
+  -- | Scale a 'Model', the vector specifying the scale factor for each axis.
+  scale :: v -> m -> m
+  -- | __UNTESTED__ Resize a 'Model' to occupy the dimensions given by
+  -- the vector.
+  resize :: v -> m -> m
+  -- | Rotate a 'Model' by different amounts around each of the three axis.
+  rotate :: v -> m -> m
+  -- | Translate a 'Model' along a 'Vector'.
+  translate :: v -> m -> m
+  -- | Mirror a 'Model' across a plane intersecting the origin.
+  mirror :: v -> m -> m
+
+instance Transform Solid Vector3d where 
+  scale = Scale
+  resize = Resize
+  rotate = Rotate
+  translate = Translate
+  mirror = Mirror
+
+instance Transform Shape Vector2d where 
+  scale = Scale2d
+  resize = Resize2d
+  rotate = Rotate2d
+  translate = Translate2d
+  mirror = Mirror2d
 
 -- | 'render' does all the real work. It will walk the AST for a 'Solid',
 -- returning an OpenSCAD program in a 'String'.
@@ -201,13 +230,13 @@ render (Hull ss) = rList "hull()" ss
 render (Scale v s) = rVecSolid "scale" v s
 render (Resize v s) = rVecSolid "resize" v s
 render (Translate v s) = rVecSolid "translate" v s
-render (Rotate v s) = "rotate(a=" ++ rVector v ++ ")" ++ render s
+render (Rotate v s) = "rotate(a=" ++ rVector3d v ++ ")" ++ render s
 render (Mirror v s) = rVecSolid "mirror" v s
 render (MultMatrix (a, b, c, d) s) =
     "multmatrix([" ++ rQuad a ++ "," ++ rQuad b ++ "," ++ rQuad c ++ ","
     ++ rQuad d ++"])\n" ++ render s
 render (Color c s) = let r = toSRGB c in
-    "color(" ++ rVector (channelRed r, channelGreen r, channelBlue r) ++ ")\n"
+    "color(" ++ rVector3d (channelRed r, channelGreen r, channelBlue r) ++ ")\n"
     ++ render s
 render (Transparent c s) =
     "color(" ++ rQuad (channelRed r, channelGreen r, channelBlue r, a) ++ ")"
@@ -217,8 +246,8 @@ render (Transparent c s) =
           toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
 render (LinearExtrude h t sc sl c f sh) =
     "linear_extrude(height=" ++ show h ++ ",twist=" ++ show t ++ ",scale="
-    ++ rPoint sc ++ ",slices=" ++ show sl ++ ",convexity=" ++ show c ++ rFacet f
-    ++ ")" ++ rShape sh
+    ++ rVector2d sc ++ ",slices=" ++ show sl ++ ",convexity=" ++ show c
+    ++ rFacet f ++ ")" ++ rShape sh
 render (RotateExtrude c f sh) =
   "rotate_extrude(convexity=" ++ show c ++ rFacet f ++ ")" ++ rShape sh
 render (Var (Fa f) ss) = rList ("assign($fa=" ++ show f ++ ")") ss
@@ -246,22 +275,22 @@ rShape (Circle r f) = "circle(" ++ show r ++ rFacet f ++ ");\n\n"
 rShape (Import2d f) = "import(" ++ f ++ ");\n\n"
 rShape (Projection c s) =
   "projection(cut=" ++ (if c then "true)" else "false)") ++ render s
-rShape (Scale2d p s) = "scale(" ++ rPoint p ++ ")" ++ rShape s
-rShape (Resize2d p s) = "resize(" ++ rPoint p ++ ")" ++ rShape s
-rShape (Rotate2d p s) = "rotate(" ++ rPoint p ++ ")" ++ rShape s
-rShape (Translate2d p s) = "translate(" ++ rPoint p ++ ")" ++ rShape s
-rShape (Mirror2d p s) = "mirror(" ++ rPoint p ++ ")" ++ rShape s
+rShape (Scale2d p s) = "scale(" ++ rVector2d p ++ ")" ++ rShape s
+rShape (Resize2d p s) = "resize(" ++ rVector2d p ++ ")" ++ rShape s
+rShape (Rotate2d p s) = "rotate(" ++ rVector2d p ++ ")" ++ rShape s
+rShape (Translate2d p s) = "translate(" ++ rVector2d p ++ ")" ++ rShape s
+rShape (Mirror2d p s) = "mirror(" ++ rVector2d p ++ ")" ++ rShape s
 
 -- And some misc. rendering utilities.
 rList n ss = n ++ "{\n" ++  concatMap render ss ++ "}"
 rSolid n s = n ++ "()\n" ++ render s
-rVector (a, b, c) = "[" ++ show a ++ "," ++ show b ++ "," ++ show c ++ "]"
-rVecSolid n v s = n ++ "(" ++ rVector v ++ ")\n" ++ render s
+rVector3d (a, b, c) = "[" ++ show a ++ "," ++ show b ++ "," ++ show c ++ "]"
+rVecSolid n v s = n ++ "(" ++ rVector3d v ++ ")\n" ++ render s
 rQuad (w, x, y, z) =
   "[" ++ show w ++ "," ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]"
 rFacet Def = ""
 rFacet f = "," ++ showFacet f
-rPoint (x, y)  = "[" ++ show x ++ "," ++ show y ++ "]"
+rVector2d (x, y)  = "[" ++ show x ++ "," ++ show y ++ "]"
 
 -- render a facet setting.
 showFacet :: Facet -> String
@@ -313,28 +342,8 @@ minkowski = Minkowski
 hull :: [Solid] -> Solid
 hull = Hull
 
--- | Scale a 'Solid', specifying the scale factor for each axis.
-scale :: Vector -> Solid -> Solid
-scale = Scale
-
--- | __UNTESTED__ Resize a 'Solid' to occupy the given dimensions.
-resize :: Vector -> Solid -> Solid
-resize = Resize
-
--- | Rotate a 'Solid' by different amounts around each of the three axis.
-rotate :: Vector -> Solid -> Solid
-rotate = Rotate
-
--- | Translate a 'Solid' along a 'Vector'.
-translate :: Vector -> Solid -> Solid
-translate = Translate
-
--- | Mirror a 'Solid' across a plane intersecting the origin.
-mirror :: Vector -> Solid -> Solid
-mirror = Mirror
-
--- | Transform a 'Solid' with a 'Transform' matrix.
-multMatrix :: Transform -> Solid -> Solid
+-- | Transform a 'Solid' with a 'TransMatrix'
+multMatrix :: TransMatrix -> Solid -> Solid
 multMatrix = MultMatrix
 
 -- | A 'translate' that just goes up, since those seem to be common.
@@ -357,7 +366,7 @@ transparent = Transparent
 -- | Extrude a 'Shape' along a line with @linear_extrude@.
 linearExtrude :: Float         -- ^ height
               -> Float         -- ^ twist
-              -> Point         -- ^ scale
+              -> Vector2d      -- ^ scale
               -> Int           -- ^ slices
               -> Int           -- ^ convexity
               -> Facet
@@ -373,26 +382,6 @@ rotateExtrude = RotateExtrude
 -- | Use 'diam' to turn a diameter into a radius for circles, spheres, etc.
 diam :: Float -> Float
 diam = (/ 2)
-
--- | 'scale2d' is 'scale' for 'Shape's.
-scale2d :: Point -> Shape -> Shape
-scale2d = Scale2d
-
--- | 'resize2d' is 'resize' for 'Shape's.
-resize2d :: Point -> Shape -> Shape
-resize2d = Resize2d
-
--- | 'rotate2d' is 'rotate' for 'Shape's.
-rotate2d :: Point -> Shape -> Shape
-rotate2d = Rotate2d
-
--- | 'translate2d' is 'translate' for 'Shape's.
-translate2d :: Point -> Shape -> Shape
-translate2d = Translate2d
-
--- | 'mirror2d' is 'mirror' for 'Shape's.
-mirror2d :: Point -> Shape -> Shape
-mirror2d = Mirror2d
 
 -- Convenience functions for Facets.
 
