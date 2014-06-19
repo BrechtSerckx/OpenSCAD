@@ -118,6 +118,8 @@ data Shape =
            | Rotate2d Vector2d Shape
            | Translate2d Vector2d Shape
            | Mirror2d Vector2d Shape
+           | Color2d (Colour Float) Shape
+           | Transparent2d (AlphaColour Float) Shape
            deriving Show
 
 -- | A 'Solid' is a solid object in OpenSCAD. Since we don't have
@@ -193,6 +195,14 @@ class (Model m, Vector v) => Transform m v | m -> v where
   translate :: v -> m -> m
   -- | Mirror a 'Model' across a plane intersecting the origin.
   mirror :: v -> m -> m
+  -- | Render a 'Model' in a specific color. This doesn't us the
+  -- OpenSCAD color model, but instead uses the 'Data.Colour' model. The
+  -- 'Graphics.OpenSCAD' module rexports 'Data.Colour.Names' so you can
+  -- conveniently say @'color' 'red' /'Solid'/@.
+  color :: Colour Float -> m -> m
+  -- | Render a 'Solid' in a transparent color. This uses the
+  -- 'Data.Coulor.AphaColour' color model.
+  transparent :: AlphaColour Float -> m -> m
 
 instance Transform Solid Vector3d where 
   scale = Scale
@@ -200,6 +210,8 @@ instance Transform Solid Vector3d where
   rotate = Rotate
   translate = Translate
   mirror = Mirror
+  color = Color
+  transparent = Transparent
 
 instance Transform Shape Vector2d where 
   scale = Scale2d
@@ -207,6 +219,8 @@ instance Transform Shape Vector2d where
   rotate = Rotate2d
   translate = Translate2d
   mirror = Mirror2d
+  color = Color2d
+  transparent = Transparent2d
 
 -- | 'render' does all the real work. It will walk the AST for a 'Solid',
 -- returning an OpenSCAD program in a 'String'.
@@ -279,6 +293,16 @@ rShape (Resize2d p s) = "resize(" ++ rVector2d p ++ ")" ++ rShape s
 rShape (Rotate2d p s) = "rotate(" ++ rVector2d p ++ ")" ++ rShape s
 rShape (Translate2d p s) = "translate(" ++ rVector2d p ++ ")" ++ rShape s
 rShape (Mirror2d p s) = "mirror(" ++ rVector2d p ++ ")" ++ rShape s
+rShape (Color2d c s) = let r = toSRGB c in
+    "color(" ++ rVector3d (channelRed r, channelGreen r, channelBlue r) ++ ")\n"
+    ++ rShape s
+rShape (Transparent2d c s) =
+    "color(" ++ rQuad (channelRed r, channelGreen r, channelBlue r, a) ++ ")"
+    ++ rShape s
+    where r = toSRGB $ toPure c
+          a = alphaChannel c
+          toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
+
 
 -- And some misc. rendering utilities.
 rList n ss = n ++ "{\n" ++  concatMap render ss ++ "}"
@@ -349,18 +373,6 @@ multMatrix = MultMatrix
 up :: Float -> Solid -> Solid
 up f = Translate (0, 0, f)
 
-
--- | Render a 'Solid' in a specific color. This doesn't us the
--- OpenSCAD color model, but instead uses the 'Data.Colour' model. The
--- 'Graphics.OpenSCAD' module rexports 'Data.Colour.Names' so you can
--- conveniently say @'color' 'red' /'Solid'/@.
-color :: Colour Float -> Solid -> Solid
-color = Color
-
--- | Render a 'Solid' in a transparent color. This uses the
--- 'Data.Coulor.AphaColour' color model.
-transparent :: AlphaColour Float -> Solid -> Solid
-transparent = Transparent
 
 -- | Turn a 'Shape' into a 'Solid' exactly as is.
 solid :: Shape -> Solid

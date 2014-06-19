@@ -70,9 +70,13 @@ main = defaultMainWithOpts [
                    (0, 1, 0, 20),
                    (0, 0, 1, 30),
                    (0, 0, 0,  1) ) $ cylinder 2 3 def),
-  st "color" "color([1.0,0.0,0.0])cube([1.0,1.0,1.0]);" (color red $ cube 1),
-  st "transparent" "color([1.0,0.0,0.0,0.7])cube([1.0,1.0,1.0]);"
+  st "color 1" "color([1.0,0.0,0.0])cube([1.0,1.0,1.0]);" (color red $ cube 1),
+  st "color 2" "color([1.0,0.0,0.0])square([1.0,1.0]);"
+     (solid . color red $ square 1),
+  st "transparent 1" "color([1.0,0.0,0.0,0.7])cube([1.0,1.0,1.0]);"
      (transparent (red `withOpacity` 0.7) $ cube 1),
+  st "transparent 2" "color([1.0,0.0,0.0,0.7])square([1.0,1.0]);"
+     (solid . transparent (red `withOpacity` 0.7) $ square 1),
   st "linearExtrude 1"
      "linear_extrude(height=10.0,twist=0.0,scale=[1.0,1.0],slices=10,convexity=10)circle(1.0);"
      (linearExtrude 10 0 (1, 1) 10 10 def $ circle 1 def),
