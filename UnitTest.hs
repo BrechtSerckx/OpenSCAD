@@ -40,21 +40,31 @@ main = defaultMainWithOpts [
   st "projection"   "projection(cut=false)scale([10.0,10.0,10.0])difference(){translate([0.0,0.0,1.0])cube([1.0,1.0,1.0]);translate([0.25,0.25,0.0])cube([0.5,0.5,3.0]);}"
      (projection False $ scale (10, 10, 10) $ difference (up 1 (cube 1)) $ translate (0.25, 0.25, 0) (box 0.5 0.5 3)),
   -- Transformations
-  st "scale"        "scale([0.5,1.0,2.0])cube([1.0,1.0,1.0]);"
-     (scale(0.5, 1, 2) $ cube 1),
+  st "scale 1"      "scale([0.5,1.0,2.0])cube([1.0,1.0,1.0]);"
+     (scale (0.5, 1, 2) $ cube 1),
+  st "scale 2"      "scale([0.5,2.0])square([1.0,1.0]);"
+     (solid . scale (0.5, 2) $ rectangle 1 1),
   -- resize goes here
-  st "rotate 1" "rotate(a=[180.0,0.0,0.0])cube([2.0,2.0,2.0]);"
+  st "rotate 1" "rotate([180.0,0.0,0.0])cube([2.0,2.0,2.0]);"
      (rotate (180, 0, 0) $ cube 2),
-  st "rotate 2" "rotate(a=[0.0,180.0,0.0])cube([2.0,2.0,2.0]);"
+  st "rotate 2" "rotate([0.0,180.0,0.0])cube([2.0,2.0,2.0]);"
      (rotate (0, 180, 0) $ cube 2),
-  st "rotate 3" "rotate(a=[0.0,180.0,180.0])cube([2.0,2.0,2.0]);"
+  st "rotate 3" "rotate([0.0,180.0,180.0])cube([2.0,2.0,2.0]);"
      (rotate (0, 180, 180) $ cube 2),
+  st "rotate 4" "rotate([180.0,0.0])square([2.0,1.0]);"
+     (solid . rotate (180, 0) $ rectangle 2 1),
+  st "rotate 5" "rotate([0.0,180.0])square([2.0,1.0]);"
+     (solid . rotate (0, 180) $ rectangle 2 1),
   st "mirror 1" "mirror([1.0,0.0,0.0])cube([2.0,2.0,2.0]);"
      (mirror (1, 0, 0) $ cube 2),
   st "mirror 2" "mirror([0.0,1.0,0.0])cube([2.0,2.0,2.0]);"
      (mirror (0, 1, 0) $ cube 2),
-  st "mirror 3" "rotate(a=[0.0,1.0,1.0])cube([2.0,2.0,2.0]);"
+  st "mirror 3" "rotate([0.0,1.0,1.0])cube([2.0,2.0,2.0]);"
      (rotate (0, 1, 1) $ cube 2),
+  st "mirror 4" "mirror([1.0,0.0])square([2.0,1.0]);"
+     (solid . mirror (1, 0) $ rectangle 2 1),
+  st "mirror 2" "mirror([0.0,1.0])square([2.0,1.0]);"
+     (solid . mirror (0, 1) $ rectangle 2 1),
   st "multmatrix" "multmatrix([[1.0,0.0,0.0,10.0],[0.0,1.0,0.0,20.0],[0.0,0.0,1.0,30.0],[0.0,0.0,0.0,1.0]])cylinder(r=2.0,h=3.0);"
      (multMatrix ( (1, 0, 0, 10),
                    (0, 1, 0, 20),

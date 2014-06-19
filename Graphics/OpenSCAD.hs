@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances,	FunctionalDependencies #-}
 
 {- |
 Module      : Graphics.OpenSCAD
@@ -53,8 +53,8 @@ module Graphics.OpenSCAD (
   -- * Rendering functions
   render, renderL,
   -- * Constructors
-  sphere, box, cube, cylinder, obCylinder, importFile, linearExtrude,
-  rotateExtrude, rectangle, square, circle, projection,
+  sphere, box, cube, cylinder, obCylinder, importFile, solid,
+  linearExtrude, rotateExtrude, rectangle, square, circle, projection,
  -- * Combinations
   union, intersection, difference, minkowski, hull,
   -- * Transformations
@@ -124,8 +124,7 @@ data Shape =
 -- optional or named objects, some constructors appear twice to allow
 -- two different variants to be used. And of course, they all have all
 -- their arguments.
-data Solid =
-             Sphere Float Facet
+data Solid = Sphere Float Facet
            | Box Float Float Float
            | Cylinder Float Float Facet
            | ObCylinder Float Float Float Facet
@@ -230,7 +229,7 @@ render (Hull ss) = rList "hull()" ss
 render (Scale v s) = rVecSolid "scale" v s
 render (Resize v s) = rVecSolid "resize" v s
 render (Translate v s) = rVecSolid "translate" v s
-render (Rotate v s) = "rotate(a=" ++ rVector3d v ++ ")" ++ render s
+render (Rotate v s) = "rotate(" ++ rVector3d v ++ ")" ++ render s
 render (Mirror v s) = rVecSolid "mirror" v s
 render (MultMatrix (a, b, c, d) s) =
     "multmatrix([" ++ rQuad a ++ "," ++ rQuad b ++ "," ++ rQuad c ++ ","
@@ -362,6 +361,10 @@ color = Color
 -- 'Data.Coulor.AphaColour' color model.
 transparent :: AlphaColour Float -> Solid -> Solid
 transparent = Transparent
+
+-- | Turn a 'Shape' into a 'Solid' exactly as is.
+solid :: Shape -> Solid
+solid = Shape
 
 -- | Extrude a 'Shape' along a line with @linear_extrude@.
 linearExtrude :: Float         -- ^ height
