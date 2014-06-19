@@ -30,15 +30,15 @@ main = defaultMainWithOpts [
   st "obCylinder 4" "cylinder(r1=1.0,h=2.0,r2=2.0,$fa=30.0);"
      (obCylinder 1 2  2 $ fa 30),
   -- polyhedron & import3D goes here
-  st "rectangle"    "square([2.0,3.0]);"              (rectangle3d 2 3),
-  st "square"       "square([2.0,2.0]);"              (square3d 2),
-  st "circle 1"     "circle(1.0);"                    (circle3d 1 def),
-  st "circle 2"     "circle(2.0,$fn=100);"            (circle3d 2 $ fn 100),
-  st "circle 3"     "circle(2.0,$fa=5.0);"            (circle3d 2 $ fa 5),
-  st "circle 4"     "circle(2.0,$fs=0.1);"            (circle3d 2 $ fs 0.1),
+  st "rectangle"    "square([2.0,3.0]);"              (rectangle 2 3),
+  st "square"       "square([2.0,2.0]);"              (square 2),
+  st "circle 1"     "circle(1.0);"                    (circle 1 def),
+  st "circle 2"     "circle(2.0,$fn=100);"            (circle 2 $ fn 100),
+  st "circle 3"     "circle(2.0,$fa=5.0);"            (circle 2 $ fa 5),
+  st "circle 4"     "circle(2.0,$fs=0.1);"            (circle 2 $ fs 0.1),
   -- polygon & import2D goes here
   st "projection"   "projection(cut=false)scale([10.0,10.0,10.0])difference(){translate([0.0,0.0,1.0])cube([1.0,1.0,1.0]);translate([0.25,0.25,0.0])cube([0.5,0.5,3.0]);}"
-     (projection3d False $ scale (10, 10, 10) $ difference (up 1 (cube 1)) $ translate (0.25, 0.25, 0) (box 0.5 0.5 3)),
+     (projection False $ scale (10, 10, 10) $ difference (up 1 (cube 1)) $ translate (0.25, 0.25, 0) (box 0.5 0.5 3)),
   -- Transformations
   st "scale"        "scale([0.5,1.0,2.0])cube([1.0,1.0,1.0]);"
      (scale(0.5, 1, 2) $ cube 1),

@@ -1,3 +1,6 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 {- |
 Module      : Graphics.OpenSCAD
 Description : Type-checked wrappers for the OpenSCAD primitives.
@@ -51,17 +54,13 @@ module Graphics.OpenSCAD (
   -- * Rendering functions
   render, renderL,
   -- * Constructors
-  -- ** 'Solid's
-  sphere, box, cube, cylinder, obCylinder, rectangle3d, square3d, circle3d,
-  import3d, linearExtrude, rotateExtrude,
-  -- ** 'Shape's
-  rectangle, square, circle, import2d, projection,
+  sphere, box, cube, cylinder, obCylinder, importFile, linearExtrude,
+  rotateExtrude, rectangle, square, circle, projection,
  -- * Combinations of 'Solid's
   union, intersection, difference, minkowski, hull,
   -- * Transformations
   -- ** 'Solid's
   scale, resize, rotate, translate, mirror, multMatrix, color, transparent, up,
-  projection3d, 
   -- ** 'Shape's
   scale2d, resize2d, rotate2d, translate2d, mirror2d,
   -- ** General convenience functions
@@ -105,15 +104,7 @@ data Facet = Fa Float | Fs Float | Fn Int | Def deriving Show
 
 -- | A 'Shape' is a two-dimensional object. They are a separate type
 -- so that Haskell can type check that we aren't using a 2d operation
--- on a 3d shape, or vice versa. Unfortunately, this means the
--- dynamically typed functions that accept either - and possibly
--- generate either - need to have two versions of those functions.  I
--- believe the 2d creation functions are more common for 2d objects,
--- but the 3d transformation functions are more common. Hence the 2d
--- creation functions (which have the names of 2d objects like circle,
--- square, etc.) that create 'Solid's have @3d@ appended, but the 3d
--- version of transformations that have both 2d and 3d versions have
--- @3d@ appended.
+-- on a 3d shape, or vice versa.
 data Shape =
              Rectangle Float Float
            | Circle Float Facet
@@ -160,6 +151,34 @@ data Solid =
            -- Mesh control
            | Var Facet [Solid]
            deriving Show
+
+-- | A 'Model' is an object that can have be either 2d or 3d. This class
+-- provides methods for creating them.
+class Model a where
+  -- | Create a rectangular 'Model' with @rectangle /x-size y-size/@.
+  rectangle :: Float -> Float -> a
+  -- | 'square' is a 'rectangle' with both sides the same size.
+  square :: Float -> a
+  square s = rectangle s s
+  -- | Create a circular 'Model' with @circle /radius/ 'Facet'@.
+  circle :: Float -> Facet -> a
+  -- | Project a 'Solid' into a 'Model' with @projection /cut 'Solid'/@.
+  projection :: Bool -> Solid -> a
+  -- | __UNTESTED__ 'importFile' is @import /filename/@.
+  importFile :: FilePath -> a
+
+instance Model Solid where
+  rectangle w d = Shape $ Rectangle w d
+  circle r f = Shape $ Circle r f
+  projection c s = Shape $ Projection c s
+  importFile = Import3d
+
+instance Model Shape where
+  rectangle w d = Rectangle w d
+  circle = Circle
+  projection = Projection
+  importFile = Import2d
+
 
 -- | 'render' does all the real work. It will walk the AST for a 'Solid',
 -- returning an OpenSCAD program in a 'String'.
@@ -273,16 +292,7 @@ cylinder = Cylinder
 obCylinder :: Float -> Float -> Float -> Facet -> Solid
 obCylinder = ObCylinder
 
--- | __UNTESTED__ 'import3d' is @import /filename/@, where /filename/
--- is an stl file.  It's /3d/ because import is a key word.
-import3d :: FilePath -> Solid
-import3d = Import3d
-
--- | __UNTESTED__ 'import2d' is @import /filename/@, where /filename/
--- is an image or other 2d object.
-import2d :: FilePath -> Shape
-import2d = Import2d
-
+-- Transformations
 -- | Create the union of a list of 'Solid's.
 union :: [Solid] -> Solid
 union = Union
@@ -363,38 +373,6 @@ rotateExtrude = RotateExtrude
 -- | Use 'diam' to turn a diameter into a radius for circles, spheres, etc.
 diam :: Float -> Float
 diam = (/ 2)
-
--- | Create a rectangular 'Shape' with @rectangle /x-size y-size/@.
-rectangle :: Float -> Float -> Shape
-rectangle = Rectangle
-
--- | Create a rectangular 'Solid' with @rectangle /x-size y-size/@.
-rectangle3d :: Float -> Float -> Solid
-rectangle3d w d = Shape $ Rectangle w d
-
--- | 'square' is a 'rectangle' with both sides the same size.
-square :: Float -> Shape
-square s = rectangle s s
-
--- | 'square3d' is a 'rectangle3d' with both sides the same size.
-square3d :: Float -> Solid
-square3d s = rectangle3d s s
-
--- | Create a circular 'Shape' with @circle /radius/ 'Facet'@.
-circle :: Float -> Facet -> Shape
-circle = Circle
-
--- | Create a circular 'Solid' with @circle /radius/ 'Facet'@.
-circle3d :: Float -> Facet -> Solid
-circle3d r f = Shape $ Circle r f
-
--- | Project a 'Solid' into a 'Shape' with @projection /cut 'Solid'/@.
-projection :: Bool -> Solid -> Shape
-projection = Projection
-
--- | Project a 'Solid' to a thin 'Solid' with @projection /cut 'Solid'/@.
-projection3d :: Bool -> Solid -> Solid
-projection3d c s = Shape $ Projection c s
 
 -- | 'scale2d' is 'scale' for 'Shape's.
 scale2d :: Point -> Shape -> Shape
