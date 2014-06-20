@@ -14,6 +14,12 @@ as a string, and some utilities. The primary goal is that the output
 should always be valid OpenSCAD. If you manage to generate OpenSCAD
 source that causes OpenSCAD to complain, please open an issue.
 
+Well, seems like file imports can't be checked. Whether or not the
+import works, and the type of the file, won't be known until OpenSCAD
+actually opens the thing. I could ask the user to declare the type,
+but can't verify it, so it'll fail at run time if they get it wrong. I
+figured it's probably best not to bother them with that.
+
 Standard usage is to have a @main@ function that looks like:
 
 @
@@ -30,11 +36,11 @@ that file in OpenSCAD, and set it to automatically reload if the file
 changes. Recompiling your program will cause the model to be loaded
 and displayed by OpenSCAD.
 
-The type constructors are generally not exported, with functions being
-exported in their stead.  This allows extra checking to be done on
-those that need it.  It also provides consistency, as otherwise you'd
-have to remember whether 'box' is a constructor or a convenience
-function, etc.
+The type constructors are not exported, with functions being exported
+in their stead.  This allows extra checking to be done on those that
+need it.  It also provides consistency, as otherwise you'd have to
+remember whether 'box' is a constructor or a convenience function,
+etc.
 
 Because of this, the constructors are not documented, the exported
 functions are. The documentation is generally just the corresponding
@@ -43,24 +49,30 @@ OpenSCAD documentation. If no OpenSCAD function name is given, then
 it's the same as the 'Graphics.OpenSCAD' function. You should check
 the OpenSCAD documentation for usage information.
 
+Missing at this time: Poly*s, some special features.
+
 -}
 
 module Graphics.OpenSCAD (
-  -- * Basic data types
-  Solid, Shape, Facet,
-  -- * Type aliases for vectors, should you want them
+  -- * A 'Model' to be rendered, and a 'Vector' to fix the number of
+  -- dimensions it has.
+  Model, Vector,
+  -- * Type aliases for vectors, should you want them.
   Vector2d, Vector3d,
   -- * Rendering functions
-  render, renderL,
+  render, renderL, render2d, render2dL,
   -- * Constructors
-  sphere, box, cube, cylinder, obCylinder, importFile, solid,
-  linearExtrude, rotateExtrude, rectangle, square, circle, projection,
- -- * Combinations
+  -- ** 'Model2d's
+  rectangle, square, circle, projection, importFile,
+  -- ** 'Model3d's
+  sphere, box, cube, cylinder, obCylinder, solid,
+  linearExtrude, rotateExtrude, multMatrix,
+  -- * Combinations
   union, intersection, difference, minkowski, hull,
   -- * Transformations
-  scale, resize, rotate, translate, mirror, multMatrix, color, transparent, up,
+  scale, resize, rotate, translate, mirror, color, transparent, up,
   -- * General convenience functions
-  diam, draw, drawL,
+  diam, draw, drawL, draw2d, draw2dL,
   -- * Convenience functions for 'Facet's.
   var, fn, fs, fa, def,
   module Colours)
@@ -72,60 +84,10 @@ import Data.Colour.SRGB (channelRed, channelBlue, channelGreen, toSRGB)
 import System.FilePath (FilePath)
 import Data.Colour.Names as Colours
 
--- A vector in 2 or 3-space.
+-- | A vector in 2 or 3-space, indicating whether we're rendering a 2
+-- or 3 dimensional 'Model'.
 class Vector a where
   rVector :: a -> String
-
--- | A 'Model' is an object that can have be either 2d or 3d. This class
--- provides methods for creating them.
-class Model a where
-  -- | Create a rectangular 'Model' with @rectangle /x-size y-size/@.
-  rectangle :: Float -> Float -> a
-  -- | 'square' is a 'rectangle' with both sides the same size.
-  square :: Float -> a
-  square s = rectangle s s
-  -- | Create a circular 'Model' with @circle /radius/ 'Facet'@.
-  circle :: Float -> Facet -> a
-  -- | Project a 'Solid' into a 'Model' with @projection /cut 'Solid'/@.
-  projection :: Bool -> Solid -> a
-  -- | __UNTESTED__ 'importFile' is @import /filename/@.
-  importFile :: FilePath -> a
-  -- Internal rendering of a Model.
-  rModel :: a -> String
-
--- | A 'Transform' turns a 'Model' into another 'Model', usually using
--- a vector with the appropriate number of dimensions.
-class (Model m, Vector v) => Transform m v | m -> v where
-  -- | Scale a 'Model', the vector specifying the scale factor for each axis.
-  scale :: v -> m -> m
-  -- | __UNTESTED__ Resize a 'Model' to occupy the dimensions given by
-  -- the vector.
-  resize :: v -> m -> m
-  -- | Rotate a 'Model' by different amounts around each of the three axis.
-  rotate :: v -> m -> m
-  -- | Translate a 'Model' along a 'Vector'.
-  translate :: v -> m -> m
-  -- | Mirror a 'Model' across a plane intersecting the origin.
-  mirror :: v -> m -> m
-  -- | Render a 'Model' in a specific color. This doesn't us the
-  -- OpenSCAD color model, but instead uses the 'Data.Colour' model. The
-  -- 'Graphics.OpenSCAD' module rexports 'Data.Colour.Names' so you can
-  -- conveniently say @'color' 'red' /'Solid'/@.
-  color :: Colour Float -> m -> m
-  -- | Render a 'Solid' in a transparent color. This uses the
-  -- 'Data.Coulor.AphaColour' color model.
-  transparent :: AlphaColour Float -> m -> m
-  -- | Create the union of a list of 'Solid's.
-  union :: [m] -> m
-  -- | Create the intersection of a list of 'Models's.
-  intersection :: [m] -> m
-  -- | The difference between two 'Model's.
-  difference :: m -> m -> m
-  -- | The Minkowski sum of a list of 'Solid's.
-  minkowski :: [m] -> m
-  -- | The convex hull of a list of 'Solid's.
-  hull :: [m] -> m
-
 
 -- | 'Vector2d' is used where OpenSCAD expects an OpenSCAD @vector@ of length 2.
 type Vector2d = (Float, Float)
@@ -146,11 +108,9 @@ type TransMatrix = ((Float, Float, Float, Float), (Float, Float, Float, Float),
                     (Float, Float, Float, Float), (Float, Float, Float, Float))
 
 
--- While it's tempting to add more options to Solid, don't do it. Instead,
--- add functions that add that functionality, like cube vs. box.
---
--- Missing at this time: Poly*s, some special features.
--- There's also no way to set $f? vars globally, due to an OpenSCAD quirk.
+-- While it's tempting to add more options to Solid, Shape or Model,
+-- don't do it. Instead, add functions that add that functionality,
+-- like cube vs. box.
 
 -- | A 'Facet' is used to set one of the special variables that
 -- control the mesh used during generation of circular objects. They
@@ -158,193 +118,273 @@ type TransMatrix = ((Float, Float, Float, Float), (Float, Float, Float, Float),
 -- 'var' function to set them for the argument objects.
 data Facet = Fa Float | Fs Float | Fn Int | Def deriving Show
 
--- | A 'Shape' is a two-dimensional object. They are a separate type
--- so that Haskell can type check that we aren't using a 2d operation
--- on a 3d shape, or vice versa.
-data Shape =
-             Rectangle Float Float
+-- | A 'Shape' is a 2-dimensional object to be used in a 'Model'.
+data Shape = Rectangle Float Float
            | Circle Float Facet
-           -- add | Polygon [Vector2d] [Path] Int
-           | Projection Bool Solid
-           | Import2d FilePath
-           -- 2d versions of the transformations
-           | Scale2d Vector2d Shape
-           | Resize2d Vector2d Shape
-           | Rotate2d Vector2d Shape
-           | Translate2d Vector2d Shape
-           | Mirror2d Vector2d Shape
-           | Color2d (Colour Float) Shape
-           | Transparent2d (AlphaColour Float) Shape
-           -- and the combinations
-           | Union2d [Shape]
-           | Intersection2d [Shape]
-           | Difference2d Shape Shape
-           | Minkowski2d [Shape]
-           | Hull2d [Shape]
+           -- add | Polygon v [Path v] Int
+           | Projection Bool Model3d
+           | Import FilePath
            deriving Show
 
-instance Model Shape where
-  rectangle w d = Rectangle w d
-  circle = Circle
-  projection = Projection
-  importFile = Import2d
-  rModel = rShape
-
-instance Transform Shape Vector2d where 
-  scale = Scale2d
-  resize = Resize2d
-  rotate = Rotate2d
-  translate = Translate2d
-  mirror = Mirror2d
-  color = Color2d
-  transparent = Transparent2d
-  union = Union2d
-  intersection = Intersection2d
-  difference = Difference2d
-  minkowski = Minkowski2d
-  hull = Hull2d
-
-
--- | A 'Solid' is a solid object in OpenSCAD. Since we don't have
--- optional or named objects, some constructors appear twice to allow
--- two different variants to be used. And of course, they all have all
--- their arguments.
+-- | A 'Solid' is a 3-dimensional object to be used in a 'Model3d'.
 data Solid = Sphere Float Facet
            | Box Float Float Float
            | Cylinder Float Float Facet
            | ObCylinder Float Float Float Facet
            -- add | Polyhedron [Vector3d] [Face] Int
-           | Import3d FilePath
-           | Solid Shape
-           -- Combinations
-           | Union [Solid]
-           | Intersection [Solid]
-           | Difference Solid Solid
-           | Minkowski [Solid]
-           | Hull [Solid]
-           -- Transformations
-           | Scale Vector3d Solid
-           | Resize Vector3d Solid
-           | Rotate Vector3d Solid
-           | Translate Vector3d Solid
-           | Mirror Vector3d Solid
-           | MultMatrix TransMatrix Solid
-           | Color (Colour Float) Solid
-           | Transparent (AlphaColour Float) Solid
-           | LinearExtrude Float Float Vector2d Int Int Facet Shape
-           | RotateExtrude Int Facet Shape
-           -- Mesh control
-           | Var Facet [Solid]
+           | MultMatrix TransMatrix Model3d
+           | LinearExtrude Float Float Vector2d Int Int Facet Model2d
+           | RotateExtrude Int Facet Model2d
+           | ToSolid Model2d
            deriving Show
 
-instance Model Solid where
-  rectangle w d = Solid $ Rectangle w d
-  circle r f = Solid $ Circle r f
-  projection c s = Solid $ Projection c s
-  importFile = Import3d
-  rModel = render
+-- | A 'Model' is either a 'Shape', a 'Solid', a transformation of a
+-- 'Model', a combination of 'Model's, or a 'Model' with it's rendering
+-- tweaked by a 'Facet'.
+data Model v = Shape Shape
+             | Solid Solid
+             | Scale v (Model v)
+             | Resize v (Model v)
+             | Rotate v (Model v)
+             | Translate v (Model v)
+             | Mirror v (Model v)
+             | Color (Colour Float) (Model v)
+             | Transparent (AlphaColour Float) (Model v)
+             -- and combinations
+             | Union [Model v]
+             | Intersection [Model v]
+             | Minkowski [Model v]
+             | Hull [Model v]
+             | Difference (Model v) (Model v)
+             -- Mesh control
+             | Var Facet [Model v]
+             deriving Show
 
-instance Transform Solid Vector3d where 
-  scale = Scale
-  resize = Resize
-  rotate = Rotate
-  translate = Translate
-  mirror = Mirror
-  color = Color
-  transparent = Transparent
-  union = Union
-  intersection = Intersection
-  difference = Difference
-  minkowski = Minkowski
-  hull = Hull
+-- | Type aliases for 2d & 3d versions of 'Model'.
+type Model2d = Model Vector2d
+type Model3d = Model Vector3d
 
+-- | Create a rectangular 'Model' with @rectangle /x-size y-size/@.
+rectangle :: Vector v => Float -> Float -> Model v
+rectangle w h = Shape $ Rectangle w h
+
+-- | 'square' is a 'rectangle' with both sides the same size.
+square :: Vector v => Float -> Model v
+square s = rectangle s s
+
+-- | Create a circular 'Model' with @circle /radius/ 'Facet'@.
+circle :: Vector v => Float -> Facet -> Model v
+circle r f = Shape $ Circle r f
+
+-- | Project a 'Model3d' into a 'Model' with @projection /cut 'Solid'/@.
+projection :: Vector v => Bool -> Model3d -> Model v
+projection c s = Shape $ Projection c s
+
+-- | __UNTESTED__ 'importFile' is @import /filename/@.
+importFile :: Vector v => FilePath -> Model v
+importFile = Shape . Import
+
+-- Tools for creating Model3ds
+-- | Create a sphere with @sphere /radius 'Facet'/@.
+sphere :: Float -> Facet -> Model3d
+sphere r f = Solid $ Sphere r f
+
+-- | Create a box with @cube /x-size y-size z-size/@
+box :: Float -> Float -> Float -> Model3d
+box x y z= Solid $ Box x y z
+
+-- | A convenience function for creating a cube as a 'box' with all
+-- sides the same length.
+cube :: Float -> Model3d
+cube x = box x x x
+
+-- | Create a cylinder with @cylinder /radius height 'Facet'/@.
+cylinder :: Float -> Float -> Facet -> Model3d
+cylinder h r f = Solid $ Cylinder h r f
+
+-- | Create an oblique cylinder with @cylinder /radius1 height radius2
+-- 'Facet'/@
+obCylinder :: Float -> Float -> Float -> Facet -> Model Vector3d
+obCylinder r1 h r2 f= Solid $ ObCylinder r1 h r2 f
+
+-- | Transform a 'Model3d' with a 'TransMatrix'
+multMatrix :: TransMatrix -> Model3d -> Model3d
+multMatrix t m = Solid $ MultMatrix t m
+
+-- Tools to add a dimensions.
+-- | Turn a 2d 'Model' into a 'Solid' exactly as is.
+solid :: Model2d -> Model3d
+solid = Solid . ToSolid
+
+-- | Extrude a 2d 'Model' along a line with @linear_extrude@.
+linearExtrude :: Float    -- ^ height
+              -> Float    -- ^ twist
+              -> Vector2d -- ^ scale
+              -> Int      -- ^ slices
+              -> Int      -- ^ convexity
+              -> Facet
+              -> Model2d  -- ^ to extrude
+              -> Model3d
+linearExtrude h t sc sl c f m = Solid $ LinearExtrude h t sc sl c f m
+
+-- | Rotate a 2d 'Model' around the origin with @rotate_extrude
+-- /convexity 'Facet' 'Model'/@
+rotateExtrude ::  Int -> Facet -> Model2d -> Model3d
+rotateExtrude c f m = Solid $ RotateExtrude c f m
+
+-- Transformations
+
+
+-- | Scale a 'Model', the vector specifying the scale factor for each axis.
+scale :: Vector v => v -> Model v -> Model v
+scale = Scale
+
+-- | __UNTESTED__ Resize a 'Model' to occupy the dimensions given by
+-- the vector.
+resize :: Vector v => v -> Model v -> Model v
+resize = Resize
+
+-- | Rotate a 'Model' by different amounts around each of the three axis.
+rotate :: Vector v => v -> Model v -> Model v
+rotate = Rotate
+
+-- | Translate a 'Model' along a 'Vector'.
+translate :: Vector v => v -> Model v -> Model v
+translate = Translate
+
+-- | Mirror a 'Model' across a plane intersecting the origin.
+mirror :: Vector v => v -> Model v -> Model v
+mirror = Mirror
+
+-- | Render a 'Model' in a specific color. This doesn't us the
+-- OpenSCAD color model, but instead uses the 'Data.Colour' model. The
+-- 'Graphics.OpenSCAD' module rexports 'Data.Colour.Names' so you can
+-- conveniently say @'color' 'red' /'Solid'/@.
+color :: Vector v => Colour Float -> Model v -> Model v
+color = Color
+
+-- | Render a 'Solid' in a transparent color. This uses the
+-- 'Data.Coulor.AphaColour' color model.
+transparent :: Vector v => AlphaColour Float -> Model v -> Model v
+transparent = Transparent
+
+-- | Create the union of a list of 'Solid's.
+union :: Vector v => [Model v] -> Model v
+union = Union
+
+-- | Create the intersection of a list of 'Models's.
+intersection :: Vector v => [Model v] -> Model v
+intersection = Intersection
+
+-- | The difference between two 'Model's.
+difference :: Vector v => Model v -> Model v -> Model v
+difference = Difference
+
+-- | The Minkowski sum of a list of 'Solid's.
+minkowski :: Vector v => [Model v] -> Model v
+minkowski = Minkowski
+
+-- | The convex hull of a list of 'Solid's.
+hull :: Vector v => [Model v] -> Model v
+hull = Hull
+
+-- | A 'translate' that just goes up, since those seem to be common.
+up :: Float -> Model3d -> Model3d 
+up f = translate (0, 0, f)
 
 -- | 'render' does all the real work. It will walk the AST for a 'Solid',
 -- returning an OpenSCAD program in a 'String'.
-render :: Solid -> String
-render (Sphere x f) = "sphere(" ++ show x ++ rFacet f ++ ");\n\n"
-render (Box x y z) =
-  "cube([" ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]);\n"
-render (Cylinder r h f) =
-  "cylinder(r=" ++ show r ++ ",h=" ++ show h ++ rFacet f ++ ");\n\n"
-render (ObCylinder r1 h r2 f) =
-    "cylinder(r1=" ++ show r1 ++ ",h=" ++ show h ++ ",r2=" ++ show r2 ++ rFacet f
-    ++ ");\n\n"
-render (Import3d f) = "import(" ++ f ++");\n\n"
-render (Solid s) = rModel s
+render :: Vector v => Model v -> String
+render (Shape s) = rShape s
+render (Solid s) = rSolid s
 render (Union ss) = rList "union()" ss
 render (Intersection ss) = rList "intersection()" ss
-render (Difference s1 s2) = "difference(){" ++ rModel s1 ++ rModel s2 ++ "}\n\n"
+render (Difference s1 s2) = "difference(){" ++ render s1 ++ render s2 ++ "}\n\n"
 render (Minkowski ss) = rList "minkowski()" ss
 render (Hull ss) = rList "hull()" ss
 render (Scale v s) = rVecSolid "scale" v s
 render (Resize v s) = rVecSolid "resize" v s
 render (Translate v s) = rVecSolid "translate" v s
-render (Rotate v s) = "rotate(" ++ rVector v ++ ")" ++ rModel s
+render (Rotate v s) = "rotate(" ++ rVector v ++ ")" ++ render s
 render (Mirror v s) = rVecSolid "mirror" v s
-render (MultMatrix (a, b, c, d) s) =
-    "multmatrix([" ++ rQuad a ++ "," ++ rQuad b ++ "," ++ rQuad c ++ ","
-    ++ rQuad d ++"])\n" ++ rModel s
 render (Color c s) = let r = toSRGB c in
     "color(" ++ rVector (channelRed r, channelGreen r, channelBlue r) ++ ")\n"
-    ++ rModel s
+    ++ render s
 render (Transparent c s) =
     "color(" ++ rQuad (channelRed r, channelGreen r, channelBlue r, a) ++ ")"
-    ++ rModel s
+    ++ render s
     where r = toSRGB $ toPure c
           a = alphaChannel c
           toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
-render (LinearExtrude h t sc sl c f sh) =
-    "linear_extrude(height=" ++ show h ++ ",twist=" ++ show t ++ ",scale="
-    ++ rVector sc ++ ",slices=" ++ show sl ++ ",convexity=" ++ show c
-    ++ rFacet f ++ ")" ++ rModel sh
-render (RotateExtrude c f sh) =
-  "rotate_extrude(convexity=" ++ show c ++ rFacet f ++ ")" ++ rModel sh
 render (Var (Fa f) ss) = rList ("assign($fa=" ++ show f ++ ")") ss
 render (Var (Fs f) ss) = rList ("assign($fs=" ++ show f ++ ")") ss
 render (Var (Fn n) ss) = rList ("assign($fn=" ++ show n ++ ")") ss
 
--- | A convenience function to render a list of 'Solid's by taking
+-- utilities for rendering Shapes.
+rShape :: Shape -> String
+rShape (Rectangle r f) = "square([" ++ show r ++ "," ++ show f ++ "]);\n\n"
+rShape (Circle r f) = "circle(" ++ show r ++ rFacet f ++ ");\n\n"
+rShape (Projection c s) =
+  "projection(cut=" ++ (if c then "true)" else "false)") ++ render s
+rShape (Import f) = "import(" ++ f ++ ");\n\n"
+
+-- utilities for rendering Solids.
+rSolid :: Solid -> String
+rSolid (Sphere x f) = "sphere(" ++ show x ++ rFacet f ++ ");\n\n"
+rSolid (Box x y z) =
+  "cube([" ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]);\n"
+rSolid (Cylinder r h f) =
+  "cylinder(r=" ++ show r ++ ",h=" ++ show h ++ rFacet f ++ ");\n\n"
+rSolid (ObCylinder r1 h r2 f) =
+    "cylinder(r1=" ++ show r1 ++ ",h=" ++ show h ++ ",r2=" ++ show r2 ++ rFacet f
+    ++ ");\n\n"
+rSolid (MultMatrix (a, b, c, d) s) =
+    "multmatrix([" ++ rQuad a ++ "," ++ rQuad b ++ "," ++ rQuad c ++ ","
+    ++ rQuad d ++"])\n" ++ render s
+rSolid (LinearExtrude h t sc sl c f sh) =
+    "linear_extrude(height=" ++ show h ++ ",twist=" ++ show t ++ ",scale="
+    ++ rVector sc ++ ",slices=" ++ show sl ++ ",convexity=" ++ show c
+    ++ rFacet f ++ ")" ++ render sh
+rSolid (RotateExtrude c f sh) =
+  "rotate_extrude(convexity=" ++ show c ++ rFacet f ++ ")" ++ render sh
+rSolid (ToSolid s) = render s
+
+-- | A convenience function to render a list of 'Model's by taking
 -- their union.
-renderL :: [Solid] -> String
+renderL :: Vector v => [Model v] -> String
 renderL = render . union
+
+-- | A convenience functions for rendering 'Model2d's.
+render2d :: Model2d -> String
+render2d = render . solid
+
+-- | A convenience functions for rendering a list of 'Model2d's.
+render2dL :: [Model2d] -> String
+render2dL = render2d . union
 
 -- | A convenience function to write the rendered 'Solid' to
 -- standard output.
-draw :: Solid -> IO ()
+draw :: Vector v => Model v -> IO ()
 draw = putStrLn . render
 
--- | A convenience function to write a 'union' of 'Solid's to
+-- | A convenience function to write a 'union' of 'Model's to
 -- standard output.
-drawL :: [Solid] -> IO ()
+drawL :: Vector v => [Model v] -> IO ()
 drawL = draw . Union
 
--- utilities for rendering Shapes.
-rShape (Rectangle r f) = "square([" ++ show r ++ "," ++ show f ++ "]);\n\n"
-rShape (Circle r f) = "circle(" ++ show r ++ rFacet f ++ ");\n\n"
-rShape (Import2d f) = "import(" ++ f ++ ");\n\n"
-rShape (Projection c s) =
-  "projection(cut=" ++ (if c then "true)" else "false)") ++ rModel s
-rShape (Scale2d p s) = "scale(" ++ rVector p ++ ")" ++ rModel s
-rShape (Resize2d p s) = "resize(" ++ rVector p ++ ")" ++ rModel s
-rShape (Rotate2d p s) = "rotate(" ++ rVector p ++ ")" ++ rModel s
-rShape (Translate2d p s) = "translate(" ++ rVector p ++ ")" ++ rModel s
-rShape (Mirror2d p s) = "mirror(" ++ rVector p ++ ")" ++ rModel s
-rShape (Color2d c s) = let r = toSRGB c in
-    "color(" ++ rVector (channelRed r, channelGreen r, channelBlue r) ++ ")\n"
-    ++ rModel s
-rShape (Transparent2d c s) =
-    "color(" ++ rQuad (channelRed r, channelGreen r, channelBlue r, a) ++ ")"
-    ++ rModel s
-    where r = toSRGB $ toPure c
-          a = alphaChannel c
-          toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
+-- | A convenience function to write the rendered 'Model2d' to
+-- standard output.
+draw2d :: Model2d -> IO ()
+draw2d = putStrLn . render2d
 
+-- | A convenience function to write a 'union' of 'Model2d's to
+-- standard output.
+draw2dL :: [Model2d] -> IO ()
+draw2dL = draw2d . union
 
 -- And some misc. rendering utilities.
-rList n ss = n ++ "{\n" ++  concatMap rModel ss ++ "}"
-rSolid n s = n ++ "()\n" ++ rModel s
-rVecSolid n v s = n ++ "(" ++ rVector v ++ ")\n" ++ rModel s
+rList n ss = n ++ "{\n" ++  concatMap render ss ++ "}"
+rVecSolid n v s = n ++ "(" ++ rVector v ++ ")\n" ++ render s
 rQuad (w, x, y, z) =
   "[" ++ show w ++ "," ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]"
 rFacet Def = ""
@@ -357,62 +397,10 @@ showFacet (Fs f) = "$fs=" ++ show f
 showFacet (Fn n) = "$fn=" ++ show n
 showFacet Def    = ""
 
--- | Create a sphere with @sphere /radius 'Facet'/@.
-sphere :: Float -> Facet -> Solid
-sphere = Sphere
-
--- | Create a box with @cube /x-size y-size z-size/@
-box :: Float -> Float -> Float -> Solid
-box = Box
-
--- | A convenience function for creating a cube as a 'box' with all
--- sides the same length.
-cube :: Float -> Solid
-cube x = Box x x x
-
--- | Create a cylinder with @cylinder /radius height 'Facet'/@.
-cylinder :: Float -> Float -> Facet -> Solid
-cylinder = Cylinder
-
--- | Create an oblique cylinder with @cylinder /radius1 height radius2
--- 'Facet'/@
-obCylinder :: Float -> Float -> Float -> Facet -> Solid
-obCylinder = ObCylinder
-
--- | Transform a 'Solid' with a 'TransMatrix'
-multMatrix :: TransMatrix -> Solid -> Solid
-multMatrix = MultMatrix
-
--- | A 'translate' that just goes up, since those seem to be common.
-up :: Float -> Solid -> Solid
-up f = Translate (0, 0, f)
-
-
--- Tools to add a dimensions.
--- | Turn a 'Shape' into a 'Solid' exactly as is.
-solid :: Shape -> Solid
-solid = Solid
-
--- | Extrude a 'Shape' along a line with @linear_extrude@.
-linearExtrude :: Float         -- ^ height
-              -> Float         -- ^ twist
-              -> Vector2d      -- ^ scale
-              -> Int           -- ^ slices
-              -> Int           -- ^ convexity
-              -> Facet
-              -> Shape         -- ^ to extrude
-              -> Solid
-linearExtrude = LinearExtrude
-
--- | Rotate a 'Shape' around the origin with @rotate_extrude
--- /convexity 'Facet' 'Shape'/@
-rotateExtrude ::  Int -> Facet -> Shape -> Solid
-rotateExtrude = RotateExtrude
-
 -- Convenience functions for Facets.
 -- Maybe this should have type [Facet] -> [Solid] -> [Solid]
 -- | 'var' uses @assign@ to set a special variable for the 'Solid's.
-var :: Facet -> [Solid] -> Solid
+var :: Facet -> [Model v] -> Model v
 var = Var
 
 -- | 'fa' is used to set the @$fa@ variable in a 'Facet' or 'var'.

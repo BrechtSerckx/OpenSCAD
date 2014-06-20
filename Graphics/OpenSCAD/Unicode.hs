@@ -2,7 +2,7 @@
 
 {-
 Module      : Graphics.OpenSCAD.Unicode
-Description : Unicode operators so you can write @Solid@ expressions.
+Description : Unicode operators so you can write 'Model' expressions.
 Copyright   : &#xa9; Mike Meyer, 2014
 License     : BSD4
 Maintainer  : mwm@mired.org
@@ -21,24 +21,24 @@ infixl 9 ∆
 -- | (&#x222A;) = 'union'
 --
 -- U+222A, UNION
-(∪) :: Solid -> Solid -> Solid
+(∪) :: Vector v => Model v -> Model v -> Model v
 a ∪ b = union [a, b]
 
 -- | (&#x2229;) = 'intersection'
 --
 -- U+2229, INTERSECTION
-(∩) :: Solid -> Solid -> Solid
+(∩) :: Vector v => Model v -> Model v -> Model v
 a ∩ b = intersection [a, b]
 
 -- | (&#x2216;) = 'difference'
 --
 -- U+2216, SET MINUS
-(∖):: Solid -> Solid -> Solid
+(∖):: Vector v => Model v -> Model v -> Model v
 (∖) = difference
 
 -- | (&#x2206;) = Symmetric difference
 --
 -- U+2206, INCREMENT
-(∆) :: Solid -> Solid -> Solid
+(∆) :: Vector v => Model v -> Model v -> Model v
 a ∆ b = (a ∖ b) ∪ (b ∖ a)
 
