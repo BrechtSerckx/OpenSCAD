@@ -57,7 +57,8 @@ OpenSCAD documentation. If no OpenSCAD function name is given, then
 it's the same as the 'Graphics.OpenSCAD' function. You should check
 the OpenSCAD documentation for usage information.
 
-Missing at this time: polyhedron and offset
+Missing at this time: polyhedron. offset is documented but not
+released, so won't be exposed until the API is frozen.
 
 -}
 
@@ -130,13 +131,14 @@ data Facet = Fa Float | Fs Float | Fn Int | Def deriving Show
 
 -- | A 'Join' controls how edges in a 'polygon' are joined by the
 -- 'offset' operation.
-data Join = Bevel | Round | Miter Float 
+data Join = Bevel | Round | Miter Float deriving Show
 
 -- A 'Shape' is a 2-dimensional primitive to be used in a 'Model2d'.
 data Shape = Rectangle Float Float
            | Circle Float Facet
            | Polygon Int [Vector2d] [[Int]]
            | Projection Bool Model3d
+           | Offset Float Join Shape
            deriving Show
 
 -- A 'Solid' is a 3-dimensional primitive to be used in a 'Model3d'.
@@ -211,6 +213,10 @@ polygon ::  Int -> [[Vector2d]] -> Model2d
 polygon convexity paths = Shape . Polygon convexity points
                   $ map (concatMap (\p -> elemIndices p points)) paths
   where points = nub $ concat paths
+
+-- | 'offset' a 'Model2d's edges by @offset /delta join/@.
+offset :: Float -> Join -> Model2d -> Model2d
+offset d j (Shape s) = Shape $ Offset d j s
 
 -- Tools for creating Model3ds
 -- | Create a sphere with @sphere /radius 'Facet'/@.
@@ -358,7 +364,7 @@ render (Var (Fa f) ss) = rList ("assign($fa=" ++ show f ++ ")") ss
 render (Var (Fs f) ss) = rList ("assign($fs=" ++ show f ++ ")") ss
 render (Var (Fn n) ss) = rList ("assign($fn=" ++ show n ++ ")") ss
 
--- utilities for rendering Shapes.
+-- utility for rendering Shapes.
 rShape :: Shape -> String
 rShape (Rectangle r f) = "square([" ++ show r ++ "," ++ show f ++ "]);\n\n"
 rShape (Circle r f) = "circle(" ++ show r ++ rFacet f ++ ");\n\n"
@@ -367,6 +373,14 @@ rShape (Projection c s) =
 rShape (Polygon c points paths) =
   "polygon(points=[" ++ (intercalate "," $ map rVector points) ++ "],paths=" ++ show paths
   ++ ",convexity=" ++ show c ++ ");\n\n"
+rShape (Offset d j s) =
+  "offset(delta=" ++ show d ++ "," ++ rJoin j ++ ")" ++ rShape s
+
+-- utility for rendering Joins
+rJoin :: Join -> String
+rJoin Bevel = "join_type=bevel"
+rJoin Round = "join_type=round"
+rJoin (Miter l) = "miter_limit=" ++ show l
 
 -- utilities for rendering Solids.
 rSolid :: Solid -> String
