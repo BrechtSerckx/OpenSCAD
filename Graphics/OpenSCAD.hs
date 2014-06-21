@@ -57,7 +57,7 @@ OpenSCAD documentation. If no OpenSCAD function name is given, then
 it's the same as the 'Graphics.OpenSCAD' function. You should check
 the OpenSCAD documentation for usage information.
 
-Missing at this time: Poly*s, some special features.
+Missing at this time: Poly*s and offset.
 
 -}
 
@@ -75,7 +75,7 @@ module Graphics.OpenSCAD (
   rectangle, square, circle, projection, importFile,
   -- ** 'Model3d's
   sphere, box, cube, cylinder, obCylinder, solid,
-  linearExtrude, rotateExtrude, multMatrix,
+  linearExtrude, rotateExtrude, multMatrix, surface,
   -- * Functions
   -- ** Combinations
   union, intersection, difference, minkowski, hull,
@@ -136,7 +136,6 @@ data Shape = Rectangle Float Float
            | Circle Float Facet
            -- add | Polygon v [Path v] Int
            | Projection Bool Model3d
-           | Import FilePath
            deriving Show
 
 -- A 'Solid' is a 3-dimensional primitive to be used in a 'Model3d'.
@@ -148,6 +147,7 @@ data Solid = Sphere Float Facet
            | MultMatrix TransMatrix Model3d
            | LinearExtrude Float Float Vector2d Int Int Facet Model2d
            | RotateExtrude Int Facet Model2d
+           | Surface FilePath Bool Int
            | ToSolid Model2d
            deriving Show
 
@@ -169,7 +169,8 @@ data Model v = Shape Shape
              | Minkowski [Model v]
              | Hull [Model v]
              | Difference (Model v) (Model v)
-             -- Mesh control
+             -- And oddball stuff control
+             | Import FilePath
              | Var Facet [Model v]
              deriving Show
 
@@ -246,11 +247,14 @@ linearExtrude h t sc sl c f m = Solid $ LinearExtrude h t sc sl c f m
 rotateExtrude ::  Int -> Facet -> Model2d -> Model3d
 rotateExtrude c f m = Solid $ RotateExtrude c f m
 
+-- | Load a height map from a file with @surface /FilePath Invert Convexity/@.
+surface :: FilePath -> Bool -> Int -> Model3d
+surface f i c = Solid $ Surface f i c
 
 -- And the one polymorphic function we have.
 -- | __UNTESTED__ 'importFile' is @import /filename/@.
 importFile :: Vector v => FilePath -> Model v
-importFile = Shape . Import
+importFile = Import
 
 
 -- Transformations
@@ -328,6 +332,7 @@ render (Resize v s) = rVecSolid "resize" v s
 render (Translate v s) = rVecSolid "translate" v s
 render (Rotate v s) = "rotate(" ++ rVector v ++ ")" ++ render s
 render (Mirror v s) = rVecSolid "mirror" v s
+render (Import f) = "import(\"" ++ f ++ "\");\n\n"
 render (Color c s) = let r = toSRGB c in
     "color(" ++ rVector (channelRed r, channelGreen r, channelBlue r) ++ ")\n"
     ++ render s
@@ -347,7 +352,6 @@ rShape (Rectangle r f) = "square([" ++ show r ++ "," ++ show f ++ "]);\n\n"
 rShape (Circle r f) = "circle(" ++ show r ++ rFacet f ++ ");\n\n"
 rShape (Projection c s) =
   "projection(cut=" ++ (if c then "true)" else "false)") ++ render s
-rShape (Import f) = "import(" ++ f ++ ");\n\n"
 
 -- utilities for rendering Solids.
 rSolid :: Solid -> String
@@ -368,6 +372,9 @@ rSolid (LinearExtrude h t sc sl c f sh) =
     ++ rFacet f ++ ")" ++ render sh
 rSolid (RotateExtrude c f sh) =
   "rotate_extrude(convexity=" ++ show c ++ rFacet f ++ ")" ++ render sh
+rSolid (Surface f i c) =
+  "surface(file=\"" ++ f ++ "\"," ++ (if i then "invert=true," else "")
+  ++ "convexity=" ++ show c ++ ");\n\n"
 rSolid (ToSolid s) = render s
 
 -- | A convenience function to render a list of 'Model's by taking

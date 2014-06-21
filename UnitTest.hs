@@ -86,12 +86,18 @@ tests = [
        ],
 
      testGroup "Rotated-Extrusion" [
-       st "rotate_extrude 1"
-          "rotate_extrude(convexity=10)translate([2.0,0.0])circle(1.0);"
+       st "1" "rotate_extrude(convexity=10)translate([2.0,0.0])circle(1.0);"
           (rotateExtrude 10 def $ translate (2, 0) $ circle 1 def),
-       st "rotate_extrude 2"
+       st "2"
           "rotate_extrude(convexity=10,$fn=100)translate([2.0,0.0])circle(1.0,$fn=100);"
           (rotateExtrude 10 (fn 100) $ translate (2, 0) $ circle 1 $ fn 100)
+       ],
+
+     testGroup "Surface" [
+       st "Normal" "surface(file=\"test.dat\",convexity=5);"
+          (surface "test.dat" False 5),
+       st "Inverted" "surface(file=\"test.dat\",invert=true,convexity=5);"
+          (surface "test.dat" True 5)	-- Requires  2014.QX
        ]
      ],
      
