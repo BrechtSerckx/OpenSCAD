@@ -57,7 +57,7 @@ OpenSCAD documentation. If no OpenSCAD function name is given, then
 it's the same as the 'Graphics.OpenSCAD' function. You should check
 the OpenSCAD documentation for usage information.
 
-Missing at this time: Poly*s and offset.
+Missing at this time: polyhedron and offset
 
 -}
 
@@ -72,7 +72,7 @@ module Graphics.OpenSCAD (
   TransMatrix,
   -- * Primitive creation
   -- ** 'Model2d's
-  rectangle, square, circle, projection, importFile,
+  rectangle, square, circle, polygon, projection, importFile,
   -- ** 'Model3d's
   sphere, box, cube, cylinder, obCylinder, solid,
   linearExtrude, rotateExtrude, multMatrix, surface,
@@ -92,9 +92,10 @@ module Graphics.OpenSCAD (
 where
 
 import Data.Colour (Colour, AlphaColour, alphaChannel, darken, over, black)
-import Data.Colour.SRGB (channelRed, channelBlue, channelGreen, toSRGB)
-import System.FilePath (FilePath)
 import Data.Colour.Names as Colours
+import Data.Colour.SRGB (channelRed, channelBlue, channelGreen, toSRGB)
+import Data.List (elemIndices, nub, intercalate)
+import System.FilePath (FilePath)
 
 -- A vector in 2 or 3-space. They are used in transformations of
 -- 'Model's of their type.
@@ -110,10 +111,6 @@ instance Vector Vector2d where
 type Vector3d = (Float, Float, Float)
 instance Vector Vector3d where
   rVector (a, b, c) = "[" ++ show a ++ "," ++ show b ++ "," ++ show c ++ "]"
-
--- These are for @Poly*s@, which don't work yet.
-type Path = [Int]
-type Face = (Int, Int, Int)
 
 -- | a 4x4 transformation matrix specifying a complete 3-space
 -- transform of a 'Model3d'.
@@ -131,10 +128,14 @@ type TransMatrix = ((Float, Float, Float, Float), (Float, Float, Float, Float),
 -- 'var' function to set them for the argument objects.
 data Facet = Fa Float | Fs Float | Fn Int | Def deriving Show
 
+-- | A 'Join' controls how edges in a 'polygon' are joined by the
+-- 'offset' operation.
+data Join = Bevel | Round | Miter Float 
+
 -- A 'Shape' is a 2-dimensional primitive to be used in a 'Model2d'.
 data Shape = Rectangle Float Float
            | Circle Float Facet
-           -- add | Polygon v [Path v] Int
+           | Polygon Int [Vector2d] [[Int]]
            | Projection Bool Model3d
            deriving Show
 
@@ -196,9 +197,20 @@ square s = rectangle s s
 circle :: Float -> Facet -> Model2d
 circle r f = Shape $ Circle r f
 
--- | Project a 'Model3d' into a 'Model' with @projection /cut 'Solid'/@.
+-- | Project a 'Model3d' into a 'Model' with @projection /cut 'Model3d'/@.
 projection :: Bool -> Model3d -> Model2d
 projection c s = Shape $ Projection c s
+
+-- | Turn a list of list of 'Vector2d's and an int into @polygon
+-- /points path convexity/@. The argument to polygon is the list of
+-- paths that is the second argument to the OpenSCAD polygon function,
+-- except the points are 'Vector2d's, not references to 'Vector2d's in
+-- that functions points argument.  If you were just going to pass in
+-- the points, it now needs to be in an extra level of list.
+polygon ::  Int -> [[Vector2d]] -> Model2d
+polygon convexity paths = Shape . Polygon convexity points
+                  $ map (concatMap (\p -> elemIndices p points)) paths
+  where points = nub $ concat paths
 
 -- Tools for creating Model3ds
 -- | Create a sphere with @sphere /radius 'Facet'/@.
@@ -352,6 +364,9 @@ rShape (Rectangle r f) = "square([" ++ show r ++ "," ++ show f ++ "]);\n\n"
 rShape (Circle r f) = "circle(" ++ show r ++ rFacet f ++ ");\n\n"
 rShape (Projection c s) =
   "projection(cut=" ++ (if c then "true)" else "false)") ++ render s
+rShape (Polygon c points paths) =
+  "polygon(points=[" ++ (intercalate "," $ map rVector points) ++ "],paths=" ++ show paths
+  ++ ",convexity=" ++ show c ++ ");\n\n"
 
 -- utilities for rendering Solids.
 rSolid :: Solid -> String

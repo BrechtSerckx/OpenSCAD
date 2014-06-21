@@ -105,18 +105,26 @@ tests = [
      ],
      
   testGroup "2d-primitives" [
-    st "rectangle" "square([2.0,3.0]);"   (rectangle 2 3),
-    st "square"    "square([2.0,2.0]);"   (square 2),
-    st "circle 1"  "circle(1.0);"         (circle 1 def),
-    st "circle 2"  "circle(2.0,$fn=100);" (circle 2 $ fn 100),
-    st "circle 3"  "circle(2.0,$fa=5.0);" (circle 2 $ fa 5),
-    st "circle 4"  "circle(2.0,$fs=0.1);" (circle 2 $ fs 0.1),
-    st "import" "import(\"test.dxf\");"   (solid $ importFile "test.dxf"),
-    -- polygon goes here
-    st "projection"
-       "projection(cut=false)scale([10.0,10.0,10.0])difference(){translate([0.0,0.0,1.0])cube([1.0,1.0,1.0]);translate([0.25,0.25,0.0])cube([0.5,0.5,3.0]);}"
-       (projection False . scale (10, 10, 10) . difference (up 1 (cube 1))
-        $ translate (0.25, 0.25, 0) (box 0.5 0.5 3))
+    testGroup "Squares" [
+       st "rectangle" "square([2.0,3.0]);"   (rectangle 2 3),
+       st "square"    "square([2.0,2.0]);"   (square 2)
+       ],
+    testGroup "Circles" [
+      st "1" "circle(1.0);"         (circle 1 def),
+      st "2" "circle(2.0,$fn=100);" (circle 2 $ fn 100),
+      st "3" "circle(2.0,$fa=5.0);" (circle 2 $ fa 5),
+      st "4" "circle(2.0,$fs=0.1);" (circle 2 $ fs 0.1)
+      ],
+    testGroup "Misc" [
+      st "import" "import(\"test.dxf\");"   (solid $ importFile "test.dxf"),
+      st "polygon"
+         "polygon(points=[[0.0,0.0],[100.0,0.0],[0.0,100.0],[10.0,10.0],[80.0,10.0],[10.0,80.0]],paths=[[0,1,2],[3,4,5]],convexity=10);"
+         (polygon 10 [[(0,0),(100,0),(0,100)],[(10,10),(80,10),(10,80)]]),
+      st "projection"
+         "projection(cut=false)scale([10.0,10.0,10.0])difference(){translate([0.0,0.0,1.0])cube([1.0,1.0,1.0]);translate([0.25,0.25,0.0])cube([0.5,0.5,3.0]);}"
+         (projection False . scale (10, 10, 10) . difference (up 1 (cube 1))
+          $ translate (0.25, 0.25, 0) (box 0.5 0.5 3))
+      ]
     ],
 
   testGroup "Transformations" [
