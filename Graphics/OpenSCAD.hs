@@ -252,7 +252,7 @@ surface :: FilePath -> Bool -> Int -> Model3d
 surface f i c = Solid $ Surface f i c
 
 -- And the one polymorphic function we have.
--- | __UNTESTED__ 'importFile' is @import /filename/@.
+-- | 'importFile' is @import /filename/@.
 importFile :: Vector v => FilePath -> Model v
 importFile = Import
 

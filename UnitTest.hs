@@ -54,7 +54,10 @@ tests = [
           (obCylinder 1 2  2 $ fa 30)
        ],
 
-     -- polyhedron & 3d import goes here
+     testGroup "Misc" [
+       st "import" "import(\"test.stl\");" (solid $ importFile "test.stl")
+     -- polyhedron goes here
+       ],
 
      testGroup "Linear-Extrusion" [
        st "1" 
@@ -108,7 +111,8 @@ tests = [
     st "circle 2"  "circle(2.0,$fn=100);" (circle 2 $ fn 100),
     st "circle 3"  "circle(2.0,$fa=5.0);" (circle 2 $ fa 5),
     st "circle 4"  "circle(2.0,$fs=0.1);" (circle 2 $ fs 0.1),
-    -- polygon & 2d import goes here
+    st "import" "import(\"test.dxf\");"   (solid $ importFile "test.dxf"),
+    -- polygon goes here
     st "projection"
        "projection(cut=false)scale([10.0,10.0,10.0])difference(){translate([0.0,0.0,1.0])cube([1.0,1.0,1.0]);translate([0.25,0.25,0.0])cube([0.5,0.5,3.0]);}"
        (projection False . scale (10, 10, 10) . difference (up 1 (cube 1))
