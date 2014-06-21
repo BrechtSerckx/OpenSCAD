@@ -30,20 +30,20 @@ main = defaultMainWithOpts [
   st "obCylinder 4" "cylinder(r1=1.0,h=2.0,r2=2.0,$fa=30.0);"
      (obCylinder 1 2  2 $ fa 30),
   -- polyhedron & 3d import goes here
-  st "rectangle"    "square([2.0,3.0]);"              (solid $ rectangle 2 3),
-  st "square"       "square([2.0,2.0]);"              (solid $ square 2),
-  st "circle 1"     "circle(1.0);"                    (solid $ circle 1 def),
-  st "circle 2"     "circle(2.0,$fn=100);"            (solid $ circle 2 $ fn 100),
-  st "circle 3"     "circle(2.0,$fa=5.0);"            (solid $ circle 2 $ fa 5),
-  st "circle 4"     "circle(2.0,$fs=0.1);"            (solid $ circle 2 $ fs 0.1),
+  st "rectangle"    "square([2.0,3.0]);"              (rectangle 2 3),
+  st "square"       "square([2.0,2.0]);"              (square 2),
+  st "circle 1"     "circle(1.0);"                    (circle 1 def),
+  st "circle 2"     "circle(2.0,$fn=100);"            (circle 2 $ fn 100),
+  st "circle 3"     "circle(2.0,$fa=5.0);"            (circle 2 $ fa 5),
+  st "circle 4"     "circle(2.0,$fs=0.1);"            (circle 2 $ fs 0.1),
   -- polygon & 2d import goes here
   st "projection"   "projection(cut=false)scale([10.0,10.0,10.0])difference(){translate([0.0,0.0,1.0])cube([1.0,1.0,1.0]);translate([0.25,0.25,0.0])cube([0.5,0.5,3.0]);}"
-     (solid . projection False . scale (10, 10, 10) . difference (up 1 (cube 1)) $ translate (0.25, 0.25, 0) (box 0.5 0.5 3)),
+     (projection False . scale (10, 10, 10) . difference (up 1 (cube 1)) $ translate (0.25, 0.25, 0) (box 0.5 0.5 3)),
   -- Transformations
   st "scale 1"      "scale([0.5,1.0,2.0])cube([1.0,1.0,1.0]);"
      (scale (0.5, 1, 2) $ cube 1),
   st "scale 2"      "scale([0.5,2.0])square([1.0,1.0]);"
-     (solid . scale (0.5, 2) $ rectangle 1 1),
+     (scale (0.5, 2) $ rectangle 1 1),
   -- resize goes here
   st "rotate 1" "rotate([180.0,0.0,0.0])cube([2.0,2.0,2.0]);"
      (rotate (180, 0, 0) $ cube 2),
@@ -52,9 +52,9 @@ main = defaultMainWithOpts [
   st "rotate 3" "rotate([0.0,180.0,180.0])cube([2.0,2.0,2.0]);"
      (rotate (0, 180, 180) $ cube 2),
   st "rotate 4" "rotate([180.0,0.0])square([2.0,1.0]);"
-     (solid . rotate (180, 0) $ rectangle 2 1),
+     (rotate (180, 0) $ rectangle 2 1),
   st "rotate 5" "rotate([0.0,180.0])square([2.0,1.0]);"
-     (solid . rotate (0, 180) $ rectangle 2 1),
+     (rotate (0, 180) $ rectangle 2 1),
   st "mirror 1" "mirror([1.0,0.0,0.0])cube([2.0,2.0,2.0]);"
      (mirror (1, 0, 0) $ cube 2),
   st "mirror 2" "mirror([0.0,1.0,0.0])cube([2.0,2.0,2.0]);"
@@ -62,9 +62,9 @@ main = defaultMainWithOpts [
   st "mirror 3" "rotate([0.0,1.0,1.0])cube([2.0,2.0,2.0]);"
      (rotate (0, 1, 1) $ cube 2),
   st "mirror 4" "mirror([1.0,0.0])square([2.0,1.0]);"
-     (solid . mirror (1, 0) $ rectangle 2 1),
+     (mirror (1, 0) $ rectangle 2 1),
   st "mirror 2" "mirror([0.0,1.0])square([2.0,1.0]);"
-     (solid . mirror (0, 1) $ rectangle 2 1),
+     (mirror (0, 1) $ rectangle 2 1),
   st "multmatrix" "multmatrix([[1.0,0.0,0.0,10.0],[0.0,1.0,0.0,20.0],[0.0,0.0,1.0,30.0],[0.0,0.0,0.0,1.0]])cylinder(r=2.0,h=3.0);"
      (multMatrix ( (1, 0, 0, 10),
                    (0, 1, 0, 20),
@@ -72,11 +72,11 @@ main = defaultMainWithOpts [
                    (0, 0, 0,  1) ) $ cylinder 2 3 def),
   st "color 1" "color([1.0,0.0,0.0])cube([1.0,1.0,1.0]);" (color red $ cube 1),
   st "color 2" "color([1.0,0.0,0.0])square([1.0,1.0]);"
-     (solid . color red $ square 1),
+     (color red $ square 1),
   st "transparent 1" "color([1.0,0.0,0.0,0.7])cube([1.0,1.0,1.0]);"
      (transparent (red `withOpacity` 0.7) $ cube 1),
   st "transparent 2" "color([1.0,0.0,0.0,0.7])square([1.0,1.0]);"
-     (solid . transparent (red `withOpacity` 0.7) $ square 1),
+     (transparent (red `withOpacity` 0.7) $ square 1),
   st "linearExtrude 1"
      "linear_extrude(height=10.0,twist=0.0,scale=[1.0,1.0],slices=10,convexity=10)circle(1.0);"
      (linearExtrude 10 0 (1, 1) 10 10 def $ circle 1 def),

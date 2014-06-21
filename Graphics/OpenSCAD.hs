@@ -60,7 +60,7 @@ module Graphics.OpenSCAD (
   -- * Type aliases for vectors, should you want them.
   Vector2d, Vector3d,
   -- * Rendering functions
-  render, renderL, render2d, render2dL,
+  render, renderL,
   -- * Constructors
   -- ** 'Model2d's
   rectangle, square, circle, projection, importFile,
@@ -72,7 +72,7 @@ module Graphics.OpenSCAD (
   -- * Transformations
   scale, resize, rotate, translate, mirror, color, transparent, up,
   -- * General convenience functions
-  diam, draw, drawL, draw2d, draw2dL,
+  diam, draw, drawL,
   -- * Convenience functions for 'Facet's.
   var, fn, fs, fa, def,
   module Colours)
@@ -165,19 +165,19 @@ type Model2d = Model Vector2d
 type Model3d = Model Vector3d
 
 -- | Create a rectangular 'Model' with @rectangle /x-size y-size/@.
-rectangle :: Vector v => Float -> Float -> Model v
+rectangle :: Float -> Float -> Model2d
 rectangle w h = Shape $ Rectangle w h
 
 -- | 'square' is a 'rectangle' with both sides the same size.
-square :: Vector v => Float -> Model v
+square :: Float -> Model2d
 square s = rectangle s s
 
 -- | Create a circular 'Model' with @circle /radius/ 'Facet'@.
-circle :: Vector v => Float -> Facet -> Model v
+circle :: Float -> Facet -> Model2d
 circle r f = Shape $ Circle r f
 
 -- | Project a 'Model3d' into a 'Model' with @projection /cut 'Solid'/@.
-projection :: Vector v => Bool -> Model3d -> Model v
+projection :: Bool -> Model3d -> Model2d
 projection c s = Shape $ Projection c s
 
 -- | __UNTESTED__ 'importFile' is @import /filename/@.
@@ -354,14 +354,6 @@ rSolid (ToSolid s) = render s
 renderL :: Vector v => [Model v] -> String
 renderL = render . union
 
--- | A convenience functions for rendering 'Model2d's.
-render2d :: Model2d -> String
-render2d = render . solid
-
--- | A convenience functions for rendering a list of 'Model2d's.
-render2dL :: [Model2d] -> String
-render2dL = render2d . union
-
 -- | A convenience function to write the rendered 'Solid' to
 -- standard output.
 draw :: Vector v => Model v -> IO ()
@@ -371,16 +363,6 @@ draw = putStrLn . render
 -- standard output.
 drawL :: Vector v => [Model v] -> IO ()
 drawL = draw . Union
-
--- | A convenience function to write the rendered 'Model2d' to
--- standard output.
-draw2d :: Model2d -> IO ()
-draw2d = putStrLn . render2d
-
--- | A convenience function to write a 'union' of 'Model2d's to
--- standard output.
-draw2dL :: [Model2d] -> IO ()
-draw2dL = draw2d . union
 
 -- And some misc. rendering utilities.
 rList n ss = n ++ "{\n" ++  concatMap render ss ++ "}"
