@@ -55,7 +55,10 @@ main = defaultMainWithOpts [
      (scale (0.5, 1, 2) $ cube 1),
   st "scale 2"      "scale([0.5,2.0])square([1.0,1.0]);"
      (scale (0.5, 2) $ rectangle 1 1),
-  -- resize goes here
+  st "resize 1"     "resize([10.0,20.0])square([2.0,2.0]);"
+     (resize (10, 20) $ square 2)
+  st "resize 2"     "resize([10.0,20.0,30.0])cube([2.0,2.0,2.0]);"
+     (resize (10, 20, 30) $ cube 2)
   st "rotate 1" "rotate([180.0,0.0,0.0])cube([2.0,2.0,2.0]);"
      (rotate (180, 0, 0) $ cube 2),
   st "rotate 2" "rotate([0.0,180.0,0.0])cube([2.0,2.0,2.0]);"

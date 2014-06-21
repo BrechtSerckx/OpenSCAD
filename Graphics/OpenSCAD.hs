@@ -14,11 +14,19 @@ as a string, and some utilities. The primary goal is that the output
 should always be valid OpenSCAD. If you manage to generate OpenSCAD
 source that causes OpenSCAD to complain, please open an issue.
 
-Well, seems like file imports can't be checked. Whether or not the
-import works, and the type of the file, won't be known until OpenSCAD
-actually opens the thing. I could ask the user to declare the type,
-but can't verify it, so it'll fail at run time if they get it wrong. I
-figured it's probably best not to bother them with that.
+The primary affect of this is that Graphics.OpenSCAD distinguishes
+between 2d and 3d 'Model's. If you want to mix them, you must
+explicitly convert between them.  While two-dimensional model creation
+could be polymorphic functions that create either, so that such models
+could be treated as either 2d or 3d, you'd still have to explicitly
+convert models whose type was fixed as 2d by a transformation, and
+'render' wouldn't work if the type was still ambiguous, ala @render $
+square 2@.
+
+'importFile' has been left polymorphic. I couldn't find a sane way to
+check that you're importing the right file type, so detecting such
+errors - including importing a 3d file and trying to extrude it - have
+been left up to OpenScad. Oh well.
 
 Standard usage is to have a @main@ function that looks like:
 
@@ -54,27 +62,31 @@ Missing at this time: Poly*s, some special features.
 -}
 
 module Graphics.OpenSCAD (
-  -- * A 'Model' to be rendered, and a 'Vector' to fix the number of
-  -- dimensions it has.
+  -- * Types
+  -- ** A 'Model' to be rendered, and a 'Vector' that fixesx the
+  -- number of dimensions it has.
   Model, Vector,
-  -- * Type aliases for vectors, should you want them.
-  Vector2d, Vector3d,
-  -- * Rendering functions
-  render, renderL,
-  -- * Constructors
+  -- ** Types aliases with fixed dimensions
+  Model2d, Model3d, Vector2d, Vector3d,
+  --  ** Other type aliases
+  TransMatrix,
+  -- * Primitive creation
   -- ** 'Model2d's
   rectangle, square, circle, projection, importFile,
   -- ** 'Model3d's
   sphere, box, cube, cylinder, obCylinder, solid,
   linearExtrude, rotateExtrude, multMatrix,
-  -- * Combinations
+  -- * Functions
+  -- ** Combinations
   union, intersection, difference, minkowski, hull,
-  -- * Transformations
+  -- ** Transformations
   scale, resize, rotate, translate, mirror, color, transparent, up,
-  -- * General convenience functions
-  diam, draw, drawL,
-  -- * Convenience functions for 'Facet's.
+  -- ** Rendering
+  render, renderL,
+  -- ** 'Facet's.
   var, fn, fs, fa, def,
+  -- ** General convenience functions
+  diam, draw, drawL,
   module Colours)
 
 where
@@ -84,8 +96,8 @@ import Data.Colour.SRGB (channelRed, channelBlue, channelGreen, toSRGB)
 import System.FilePath (FilePath)
 import Data.Colour.Names as Colours
 
--- | A vector in 2 or 3-space, indicating whether we're rendering a 2
--- or 3 dimensional 'Model'.
+-- A vector in 2 or 3-space. They are used in transformations of
+-- 'Model's of their type.
 class Vector a where
   rVector :: a -> String
 
@@ -103,14 +115,15 @@ instance Vector Vector3d where
 type Path = [Int]
 type Face = (Int, Int, Int)
 
--- a 4x4 transformation matrix specifying a complete 3-space transform. 
+-- | a 4x4 transformation matrix specifying a complete 3-space
+-- transform of a 'Model3d'.
 type TransMatrix = ((Float, Float, Float, Float), (Float, Float, Float, Float),
                     (Float, Float, Float, Float), (Float, Float, Float, Float))
 
 
 -- While it's tempting to add more options to Solid, Shape or Model,
 -- don't do it. Instead, add functions that add that functionality,
--- like cube vs. box.
+-- by building the appropriate structure, like cube vs. box.
 
 -- | A 'Facet' is used to set one of the special variables that
 -- control the mesh used during generation of circular objects. They
@@ -118,7 +131,7 @@ type TransMatrix = ((Float, Float, Float, Float), (Float, Float, Float, Float),
 -- 'var' function to set them for the argument objects.
 data Facet = Fa Float | Fs Float | Fn Int | Def deriving Show
 
--- | A 'Shape' is a 2-dimensional object to be used in a 'Model'.
+-- A 'Shape' is a 2-dimensional primitive to be used in a 'Model2d'.
 data Shape = Rectangle Float Float
            | Circle Float Facet
            -- add | Polygon v [Path v] Int
@@ -126,7 +139,7 @@ data Shape = Rectangle Float Float
            | Import FilePath
            deriving Show
 
--- | A 'Solid' is a 3-dimensional object to be used in a 'Model3d'.
+-- A 'Solid' is a 3-dimensional primitive to be used in a 'Model3d'.
 data Solid = Sphere Float Facet
            | Box Float Float Float
            | Cylinder Float Float Facet
@@ -138,9 +151,9 @@ data Solid = Sphere Float Facet
            | ToSolid Model2d
            deriving Show
 
--- | A 'Model' is either a 'Shape', a 'Solid', a transformation of a
--- 'Model', a combination of 'Model's, or a 'Model' with it's rendering
--- tweaked by a 'Facet'.
+-- | A 'Model' is either a 'Model2d', a 'Model3d', a transformation of
+-- a 'Model', a combination of 'Model's, or a 'Model' with it's
+-- rendering tweaked by a 'Facet'. 'Model's can be rendered.
 data Model v = Shape Shape
              | Solid Solid
              | Scale v (Model v)
@@ -160,11 +173,17 @@ data Model v = Shape Shape
              | Var Facet [Model v]
              deriving Show
 
--- | Type aliases for 2d & 3d versions of 'Model'.
+-- | A two-dimensional model. Note that the types do not mix
+-- implicitly. You must turn a 'Model2d' into a 'Model3d' using one of
+-- 'linearExtrude', 'rotateExtrude', or 'solid'.
 type Model2d = Model Vector2d
+
+-- | A three-dimensional model. You can create a 'Model2d' from a
+-- 'Model3d' using 'projection'.
 type Model3d = Model Vector3d
 
--- | Create a rectangular 'Model' with @rectangle /x-size y-size/@.
+-- Tools for creating 'Model2d's.
+-- | Create a rectangular 'Model2d' with @rectangle /x-size y-size/@.
 rectangle :: Float -> Float -> Model2d
 rectangle w h = Shape $ Rectangle w h
 
@@ -179,10 +198,6 @@ circle r f = Shape $ Circle r f
 -- | Project a 'Model3d' into a 'Model' with @projection /cut 'Solid'/@.
 projection :: Bool -> Model3d -> Model2d
 projection c s = Shape $ Projection c s
-
--- | __UNTESTED__ 'importFile' is @import /filename/@.
-importFile :: Vector v => FilePath -> Model v
-importFile = Shape . Import
 
 -- Tools for creating Model3ds
 -- | Create a sphere with @sphere /radius 'Facet'/@.
@@ -211,7 +226,6 @@ obCylinder r1 h r2 f= Solid $ ObCylinder r1 h r2 f
 multMatrix :: TransMatrix -> Model3d -> Model3d
 multMatrix t m = Solid $ MultMatrix t m
 
--- Tools to add a dimensions.
 -- | Turn a 2d 'Model' into a 'Solid' exactly as is.
 solid :: Model2d -> Model3d
 solid = Solid . ToSolid
@@ -232,15 +246,19 @@ linearExtrude h t sc sl c f m = Solid $ LinearExtrude h t sc sl c f m
 rotateExtrude ::  Int -> Facet -> Model2d -> Model3d
 rotateExtrude c f m = Solid $ RotateExtrude c f m
 
+
+-- And the one polymorphic function we have.
+-- | __UNTESTED__ 'importFile' is @import /filename/@.
+importFile :: Vector v => FilePath -> Model v
+importFile = Shape . Import
+
+
 -- Transformations
-
-
 -- | Scale a 'Model', the vector specifying the scale factor for each axis.
 scale :: Vector v => v -> Model v -> Model v
 scale = Scale
 
--- | __UNTESTED__ Resize a 'Model' to occupy the dimensions given by
--- the vector.
+-- | Resize a 'Model' to occupy the dimensions given by the vector.
 resize :: Vector v => v -> Model v -> Model v
 resize = Resize
 
@@ -256,7 +274,7 @@ translate = Translate
 mirror :: Vector v => v -> Model v -> Model v
 mirror = Mirror
 
--- | Render a 'Model' in a specific color. This doesn't us the
+-- | Render a 'Model' in a specific color. This doesn't use the
 -- OpenSCAD color model, but instead uses the 'Data.Colour' model. The
 -- 'Graphics.OpenSCAD' module rexports 'Data.Colour.Names' so you can
 -- conveniently say @'color' 'red' /'Solid'/@.
@@ -268,6 +286,12 @@ color = Color
 transparent :: Vector v => AlphaColour Float -> Model v -> Model v
 transparent = Transparent
 
+-- | A 'translate' that just goes up, since those seem to be common.
+up :: Float -> Model3d -> Model3d 
+up f = translate (0, 0, f)
+
+
+-- Combinations
 -- | Create the union of a list of 'Solid's.
 union :: Vector v => [Model v] -> Model v
 union = Union
@@ -288,9 +312,6 @@ minkowski = Minkowski
 hull :: Vector v => [Model v] -> Model v
 hull = Hull
 
--- | A 'translate' that just goes up, since those seem to be common.
-up :: Float -> Model3d -> Model3d 
-up f = translate (0, 0, f)
 
 -- | 'render' does all the real work. It will walk the AST for a 'Solid',
 -- returning an OpenSCAD program in a 'String'.
@@ -380,8 +401,7 @@ showFacet (Fn n) = "$fn=" ++ show n
 showFacet Def    = ""
 
 -- Convenience functions for Facets.
--- Maybe this should have type [Facet] -> [Solid] -> [Solid]
--- | 'var' uses @assign@ to set a special variable for the 'Solid's.
+-- | 'var' uses @assign@ to set a 'Facet' variable for it's 'Models's.
 var :: Facet -> [Model v] -> Model v
 var = Var
 
@@ -402,7 +422,7 @@ fn = Fn
 def :: Facet
 def = Def
 
--- And one last tool.
+-- And one last convenience function.
 -- | Use 'diam' to turn a diameter into a radius for circles, spheres, etc.
 diam :: Float -> Float
 diam = (/ 2)
