@@ -11,6 +11,17 @@ import Data.Colour (withOpacity)
 sw = concat . words
 st n e a = testCase n $ (sw e) @=?(sw $ render a)
 
+{- About the test result values.
+
+Running "cabal test" does not verify that the results do the intended
+thing in OpenSCAD. Possibly we'll add shell tests for that at some
+point, but not yet.
+
+For now, if you change or add strings, please manually copy them into
+OpenSCAD and make sure they do what you want the Model data structure
+that they are testing does.
+-}
+
 main = defaultMainWithOpts [
   st "sphere 1"     "sphere(1.0);"                    (sphere 1 def),
   st "sphere 2"     "sphere(2.0,$fn=100);"            (sphere 2 $ fn 100),
