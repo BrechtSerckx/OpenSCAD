@@ -104,19 +104,20 @@ class Vector a where
   rVector :: a -> String
 
 -- | 'Vector2d' is used where OpenSCAD expects an OpenSCAD @vector@ of length 2.
-type Vector2d = (Float, Float)
+type Vector2d = (Double, Double)
 instance Vector Vector2d where
   rVector (x, y) = "[" ++ show x ++ "," ++ show y ++ "]"
 
 -- | 'Vector3d' is used where OpenSCAD expects an OpenSCAD @vector@ of length 3.
-type Vector3d = (Float, Float, Float)
+type Vector3d = (Double, Double, Double)
 instance Vector Vector3d where
   rVector (a, b, c) = "[" ++ show a ++ "," ++ show b ++ "," ++ show c ++ "]"
 
 -- | a 4x4 transformation matrix specifying a complete 3-space
 -- transform of a 'Model3d'.
-type TransMatrix = ((Float, Float, Float, Float), (Float, Float, Float, Float),
-                    (Float, Float, Float, Float), (Float, Float, Float, Float))
+type TransMatrix =
+  ((Double, Double, Double, Double), (Double, Double, Double, Double),
+   (Double, Double, Double, Double), (Double, Double, Double, Double))
 
 
 -- While it's tempting to add more options to Solid, Shape or Model,
@@ -127,28 +128,28 @@ type TransMatrix = ((Float, Float, Float, Float), (Float, Float, Float, Float),
 -- control the mesh used during generation of circular objects. They
 -- appear as arguments to various constructors, as well as in the
 -- 'var' function to set them for the argument objects.
-data Facet = Fa Float | Fs Float | Fn Int | Def deriving Show
+data Facet = Fa Double | Fs Double | Fn Int | Def deriving Show
 
 -- | A 'Join' controls how edges in a 'polygon' are joined by the
 -- 'offset' operation.
-data Join = Bevel | Round | Miter Float deriving Show
+data Join = Bevel | Round | Miter Double deriving Show
 
 -- A 'Shape' is a 2-dimensional primitive to be used in a 'Model2d'.
-data Shape = Rectangle Float Float
-           | Circle Float Facet
+data Shape = Rectangle Double Double
+           | Circle Double Facet
            | Polygon Int [Vector2d] [[Int]]
            | Projection Bool Model3d
-           | Offset Float Join Shape
+           | Offset Double Join Shape
            deriving Show
 
 -- A 'Solid' is a 3-dimensional primitive to be used in a 'Model3d'.
-data Solid = Sphere Float Facet
-           | Box Float Float Float
-           | Cylinder Float Float Facet
-           | ObCylinder Float Float Float Facet
+data Solid = Sphere Double Facet
+           | Box Double Double Double
+           | Cylinder Double Double Facet
+           | ObCylinder Double Double Double Facet
            -- add | Polyhedron [Vector3d] [Face] Int
            | MultMatrix TransMatrix Model3d
-           | LinearExtrude Float Float Vector2d Int Int Facet Model2d
+           | LinearExtrude Double Double Vector2d Int Int Facet Model2d
            | RotateExtrude Int Facet Model2d
            | Surface FilePath Bool Int
            | ToSolid Model2d
@@ -164,8 +165,8 @@ data Model v = Shape Shape
              | Rotate v (Model v)
              | Translate v (Model v)
              | Mirror v (Model v)
-             | Color (Colour Float) (Model v)
-             | Transparent (AlphaColour Float) (Model v)
+             | Color (Colour Double) (Model v)
+             | Transparent (AlphaColour Double) (Model v)
              -- and combinations
              | Union [Model v]
              | Intersection [Model v]
@@ -188,15 +189,15 @@ type Model3d = Model Vector3d
 
 -- Tools for creating 'Model2d's.
 -- | Create a rectangular 'Model2d' with @rectangle /x-size y-size/@.
-rectangle :: Float -> Float -> Model2d
+rectangle :: Double -> Double -> Model2d
 rectangle w h = Shape $ Rectangle w h
 
 -- | 'square' is a 'rectangle' with both sides the same size.
-square :: Float -> Model2d
+square :: Double -> Model2d
 square s = rectangle s s
 
 -- | Create a circular 'Model' with @circle /radius/ 'Facet'@.
-circle :: Float -> Facet -> Model2d
+circle :: Double -> Facet -> Model2d
 circle r f = Shape $ Circle r f
 
 -- | Project a 'Model3d' into a 'Model' with @projection /cut 'Model3d'/@.
@@ -215,30 +216,30 @@ polygon convexity paths = Shape . Polygon convexity points
   where points = nub $ concat paths
 
 -- | 'offset' a 'Model2d's edges by @offset /delta join/@.
-offset :: Float -> Join -> Model2d -> Model2d
+offset :: Double -> Join -> Model2d -> Model2d
 offset d j (Shape s) = Shape $ Offset d j s
 
 -- Tools for creating Model3ds
 -- | Create a sphere with @sphere /radius 'Facet'/@.
-sphere :: Float -> Facet -> Model3d
+sphere :: Double -> Facet -> Model3d
 sphere r f = Solid $ Sphere r f
 
 -- | Create a box with @cube /x-size y-size z-size/@
-box :: Float -> Float -> Float -> Model3d
+box :: Double -> Double -> Double -> Model3d
 box x y z= Solid $ Box x y z
 
 -- | A convenience function for creating a cube as a 'box' with all
 -- sides the same length.
-cube :: Float -> Model3d
+cube :: Double -> Model3d
 cube x = box x x x
 
 -- | Create a cylinder with @cylinder /radius height 'Facet'/@.
-cylinder :: Float -> Float -> Facet -> Model3d
+cylinder :: Double -> Double -> Facet -> Model3d
 cylinder h r f = Solid $ Cylinder h r f
 
 -- | Create an oblique cylinder with @cylinder /radius1 height radius2
 -- 'Facet'/@
-obCylinder :: Float -> Float -> Float -> Facet -> Model Vector3d
+obCylinder :: Double -> Double -> Double -> Facet -> Model Vector3d
 obCylinder r1 h r2 f= Solid $ ObCylinder r1 h r2 f
 
 -- | Transform a 'Model3d' with a 'TransMatrix'
@@ -250,8 +251,8 @@ solid :: Model2d -> Model3d
 solid = Solid . ToSolid
 
 -- | Extrude a 2d 'Model' along a line with @linear_extrude@.
-linearExtrude :: Float    -- ^ height
-              -> Float    -- ^ twist
+linearExtrude :: Double   -- ^ height
+              -> Double   -- ^ twist
               -> Vector2d -- ^ scale
               -> Int      -- ^ slices
               -> Int      -- ^ convexity
@@ -300,16 +301,16 @@ mirror = Mirror
 -- OpenSCAD color model, but instead uses the 'Data.Colour' model. The
 -- 'Graphics.OpenSCAD' module rexports 'Data.Colour.Names' so you can
 -- conveniently say @'color' 'red' /'Solid'/@.
-color :: Vector v => Colour Float -> Model v -> Model v
+color :: Vector v => Colour Double -> Model v -> Model v
 color = Color
 
 -- | Render a 'Solid' in a transparent color. This uses the
 -- 'Data.Coulor.AphaColour' color model.
-transparent :: Vector v => AlphaColour Float -> Model v -> Model v
+transparent :: Vector v => AlphaColour Double -> Model v -> Model v
 transparent = Transparent
 
 -- | A 'translate' that just goes up, since those seem to be common.
-up :: Float -> Model3d -> Model3d 
+up :: Double -> Model3d -> Model3d 
 up f = translate (0, 0, f)
 
 
@@ -442,11 +443,11 @@ var :: Facet -> [Model v] -> Model v
 var = Var
 
 -- | 'fa' is used to set the @$fa@ variable in a 'Facet' or 'var'.
-fa :: Float -> Facet
+fa :: Double -> Facet
 fa = Fa
 
 -- | 'fs' is used to set the @$fs@ variable in a 'Facet' or 'var'.
-fs :: Float -> Facet
+fs :: Double -> Facet
 fs = Fs
 
 -- | 'fn' is used to set the @$fn@ variable in a 'Facet' or 'var'.
@@ -460,6 +461,6 @@ def = Def
 
 -- And one last convenience function.
 -- | Use 'diam' to turn a diameter into a radius for circles, spheres, etc.
-diam :: Float -> Float
+diam :: Double -> Double
 diam = (/ 2)
 
