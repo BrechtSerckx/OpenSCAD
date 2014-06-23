@@ -8,7 +8,7 @@ License     : BSD4
 Maintainer  : mwm@mired.org
 Stability   : experimental
 
-** Overview
+= Overview
 
 The Graphics.OpenSCAD module provides abstract data types for creating
 OpenSCAD model definitions calls, along with a function to render it
@@ -25,7 +25,7 @@ convert models whose type was fixed as 2d by a transformation, and
 'render' wouldn't work if the type was still ambiguous, ala @render $
 square 2@.
 
-** Usage
+= Usage
 
 Standard usage is to have a @main@ function that looks like:
 
@@ -56,27 +56,28 @@ OpenSCAD documentation. If no OpenSCAD function name is given, then
 it's the same as the 'Graphics.OpenSCAD' function. You should check
 the OpenSCAD documentation for usage information.
 
-** Oddities
+= Oddities
 
 'importFile' has been left polymorphic. I couldn't find a sane way to
 check that you're importing the right file type, so detecting such
 errors - including importing a 3d file and trying to extrude it - have
-been left up to OpenSCAD in any case.  So for now, there's just
+to be left up to OpenSCAD in any case.  So for now, there's just
 'importFile'. This does create the oddity that if you import a file
-and try and render it without doing something to force a dimensional
-on it (one of the transformations, an extrusion or projection, or
-'solid') you'll get a compile error because the type is
+and try and render it without doing something to indicate how many
+dimensions it has (one of the transformations, an extrusion or
+projection, or 'solid') you'll get a compile error because the type is
 ambiguous. Later, this may turn into @import2d@ and @import3d@.
 
-Polygons and polyhedrons have a serious change in their
-interface. Rather than expecting you to enter a list of points and
-then references to them, you just enter the points directly. If you
-really want to do that version, you can do:
+The interfaces for 'polygon's and 'polyhedron's is seriously different
+from the OpenSCAD interface. Rather than expecting you to enter a list
+of points and then references to them, you just enter the points
+directly. If you really want to do it the OpenSCAD way, you can do
+something like:
 
 @
-points = [.....]
-p i = points !! i
 draw $ polyhedron [[(p 0, p 1, p 2), (p 0, p 2, p 3), ... ]]
+where points = [.....]
+      p i = points !! i
 @
 
 Also, the OpenSCAD polyedron code recently changed. The old version
@@ -88,21 +89,21 @@ three points you get an error. At this time, no tests are done on the
 faces. That will probably change in the future.
 
 Offset is missing even though it's documented, as it isn't supported
-by the released version, so presumably subject to change. It is
-implemented, but untested as yet. You can add it to the module's
+by a released version of OpenSCAD, so presumably subject to change. It
+is implemented, but untested as yet. You can add it to the module's
 export lists if you want to play with it.
 
 -}
 
 module Graphics.OpenSCAD (
   -- * Types
-  -- ** A 'Model' to be rendered, and a 'Vector' that fixesx the
+  -- ** A 'Model' to be rendered, and a 'Vector' that fixes the
   -- number of dimensions it has.
   Model, Vector,
   -- ** Types aliases with fixed dimensions
   Model2d, Model3d, Vector2d, Vector3d,
   --  ** Other type aliases
-  TransMatrix,
+  Facet, TransMatrix,
   -- * Primitive creation
   -- ** 'Model2d's
   rectangle, square, circle, polygon, projection, importFile,
@@ -135,17 +136,19 @@ import System.FilePath (FilePath)
 class Vector a where
   rVector :: a -> String
 
--- | 'Vector2d' is used where OpenSCAD expects an OpenSCAD @vector@ of length 2.
+-- | 'Vector2d' is used where 'Graphics.OpenSCAD' expects an OpenSCAD
+-- @vector@ of length 2.
 type Vector2d = (Double, Double)
 instance Vector Vector2d where
   rVector (x, y) = "[" ++ show x ++ "," ++ show y ++ "]"
 
--- | 'Vector3d' is used where OpenSCAD expects an OpenSCAD @vector@ of length 3.
+-- | 'Vector3d' is used where 'Graphics.OpenSCAD' expects an OpenSCAD
+-- @vector@ of length 3.
 type Vector3d = (Double, Double, Double)
 instance Vector Vector3d where
   rVector (a, b, c) = "[" ++ show a ++ "," ++ show b ++ "," ++ show c ++ "]"
 
--- | a 4x4 transformation matrix specifying a complete 3-space
+-- | A 4x4 transformation matrix specifying a complete 3-space
 -- transform of a 'Model3d'.
 type TransMatrix =
   ((Double, Double, Double, Double), (Double, Double, Double, Double),
@@ -243,7 +246,7 @@ projection c s = Shape $ Projection c s
 -- paths that is the second argument to the OpenSCAD polygon function,
 -- except the points are 'Vector2d's, not references to 'Vector2d's in
 -- that functions points argument.  If you were just going to pass in
--- the points, it now needs to be in an extra level of list.
+-- the points, it now needs to be in an extra level of 'List'.
 polygon ::  Int -> [[Vector2d]] -> Model2d
 polygon convexity paths = Shape . Polygon convexity points
                   $ map (concatMap (\p -> elemIndices p points)) paths
@@ -271,21 +274,21 @@ cube x = box x x x
 cylinder :: Double -> Double -> Facet -> Model3d
 cylinder h r f = Solid $ Cylinder h r f
 
--- | Create an oblique cylinder with @cylinder /radius1 height radius2
--- 'Facet'/@
+-- | Create an oblique cylinder with @cylinder /radius1 height radius2 'Facet'/@.
 obCylinder :: Double -> Double -> Double -> Facet -> Model Vector3d
 obCylinder r1 h r2 f= Solid $ ObCylinder r1 h r2 f
 
 -- | Turn a list of list of 'Vector3d's and an int into @polyhedron
 -- /points 'Sides' convexity/@. The argument to polyhedron is the list
 -- of paths that is the second argument to the OpenSCAD polygon
--- function, except the points are 'Vector3d's, not references to
--- 'Vector3d's in that functions points argument.  The function will
--- build the appropriate function call, using @faces@ if you pass in a
--- side that uses more than 3 points, or @triangles@ if not. Note that
--- @faces@ doesn't work in older versions of OpenSCAD, an @triangles@
--- is depreciate. Until a mechanism to set the version of OpenSCAD is
--- provided, generating the @faces@ version will cause an error.
+-- function, except the points are 'Vector3d's, not the references to
+-- 'Vector3d's used in that functions @points@ argument.  The function
+-- will build the appropriate function call, using @faces@ if you pass
+-- in a side that uses more than 3 points, or @triangles@ if not. Note
+-- that @faces@ doesn't work in older versions of OpenSCAD, an
+-- @triangles@ is depreciate. Until a mechanism to set the version of
+-- OpenSCAD is provided, generating the @faces@ version will cause an
+-- error.
 polyhedron ::  Int -> [[Vector3d]] -> Model3d
 polyhedron convexity paths = Solid . Polyhedron convexity points $ sides sin
   where points = nub $ concat paths
@@ -298,11 +301,11 @@ polyhedron convexity paths = Solid . Polyhedron convexity points $ sides sin
 multMatrix :: TransMatrix -> Model3d -> Model3d
 multMatrix t m = Solid $ MultMatrix t m
 
--- | Turn a 2d 'Model' into a 'Solid' exactly as is.
+-- | Turn a 'Model2d' into a 'Model3d' exactly as is.
 solid :: Model2d -> Model3d
 solid = Solid . ToSolid
 
--- | Extrude a 2d 'Model' along a line with @linear_extrude@.
+-- | Extrude a 'Model2d' along a line with @linear_extrude@.
 linearExtrude :: Double   -- ^ height
               -> Double   -- ^ twist
               -> Vector2d -- ^ scale
@@ -313,7 +316,7 @@ linearExtrude :: Double   -- ^ height
               -> Model3d
 linearExtrude h t sc sl c f m = Solid $ LinearExtrude h t sc sl c f m
 
--- | Rotate a 2d 'Model' around the origin with @rotate_extrude
+-- | Rotate a 'Model2d' around the origin with @rotate_extrude
 -- /convexity 'Facet' 'Model'/@
 rotateExtrude ::  Int -> Facet -> Model2d -> Model3d
 rotateExtrude c f m = Solid $ RotateExtrude c f m
@@ -333,7 +336,8 @@ importFile = Import
 scale :: Vector v => v -> Model v -> Model v
 scale = Scale
 
--- | Resize a 'Model' to occupy the dimensions given by the vector.
+-- | Resize a 'Model' to occupy the dimensions given by the vector. Note that
+-- this does nothing prior to the 2014 versions of OpenSCAD.
 resize :: Vector v => v -> Model v -> Model v
 resize = Resize
 
@@ -352,11 +356,11 @@ mirror = Mirror
 -- | Render a 'Model' in a specific color. This doesn't use the
 -- OpenSCAD color model, but instead uses the 'Data.Colour' model. The
 -- 'Graphics.OpenSCAD' module rexports 'Data.Colour.Names' so you can
--- conveniently say @'color' 'red' /'Solid'/@.
+-- conveniently say @'color' 'red' /'Model'/@.
 color :: Vector v => Colour Double -> Model v -> Model v
 color = Color
 
--- | Render a 'Solid' in a transparent color. This uses the
+-- | Render a 'Model' in a transparent color. This uses the
 -- 'Data.Coulor.AphaColour' color model.
 transparent :: Vector v => AlphaColour Double -> Model v -> Model v
 transparent = Transparent
@@ -367,11 +371,11 @@ up f = translate (0, 0, f)
 
 
 -- Combinations
--- | Create the union of a list of 'Solid's.
+-- | Create the union of a list of 'Model's.
 union :: Vector v => [Model v] -> Model v
 union = Union
 
--- | Create the intersection of a list of 'Models's.
+-- | Create the intersection of a list of 'Model's.
 intersection :: Vector v => [Model v] -> Model v
 intersection = Intersection
 
@@ -379,16 +383,16 @@ intersection = Intersection
 difference :: Vector v => Model v -> Model v -> Model v
 difference = Difference
 
--- | The Minkowski sum of a list of 'Solid's.
+-- | The Minkowski sum of a list of 'Model's.
 minkowski :: Vector v => [Model v] -> Model v
 minkowski = Minkowski
 
--- | The convex hull of a list of 'Solid's.
+-- | The convex hull of a list of 'Model's.
 hull :: Vector v => [Model v] -> Model v
 hull = Hull
 
 
--- | 'render' does all the real work. It will walk the AST for a 'Solid',
+-- | 'render' does all the real work. It will walk the AST for a 'Model',
 -- returning an OpenSCAD program in a 'String'.
 render :: Vector v => Model v -> String
 render (Shape s) = rShape s
@@ -473,7 +477,7 @@ rListL vs = "[" ++ (intercalate "," $ map show vs) ++ "]"
 renderL :: Vector v => [Model v] -> String
 renderL = render . union
 
--- | A convenience function to write the rendered 'Solid' to
+-- | A convenience function to write the rendered 'Model' to
 -- standard output.
 draw :: Vector v => Model v -> IO ()
 draw = putStrLn . render
@@ -499,7 +503,7 @@ showFacet (Fn n) = "$fn=" ++ show n
 showFacet Def    = ""
 
 -- Convenience functions for Facets.
--- | 'var' uses @assign@ to set a 'Facet' variable for it's 'Models's.
+-- | 'var' uses @assign@ to set a 'Facet' variable for it's 'Model's.
 var :: Facet -> [Model v] -> Model v
 var = Var
 
