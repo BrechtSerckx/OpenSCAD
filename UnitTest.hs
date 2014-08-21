@@ -1,16 +1,18 @@
 #!/usr/bin/env runghc
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Main where
 
-import Data.Monoid
-import Test.HUnit
-import Test.Framework
-import Test.Framework.Providers.HUnit
+import Test.Tasty
+import Test.Tasty.HUnit
 
 import Graphics.OpenSCAD
 import Data.Colour (withOpacity)
 
+
 sw = concat . words
-st n e a = testCase n $ (sw e) @=?(sw $ render a)
+st n e a = testCase n $ (sw e) @?=(sw $ render a)
+
 
 {- About the test result values.
 
@@ -23,7 +25,7 @@ OpenSCAD and make sure they do what you want the Model data structure
 that they are testing does.
 -}
 
-tests = [
+tests = testGroup "Tests" [
   testGroup "3d-primitives" [
      testGroup "Spheres" [
         st "1" "sphere(1.0);"         (sphere 1 def),
@@ -204,6 +206,17 @@ tests = [
     st "facet 3" "assign($fs=0.1){sphere(2.0,$fs=0.1);}"
        (var (fs 0.1) [sphere 2 $ fs 0.1])
     ]
+
+  -- testGroup "Errors" [
+  --   testCase "PointCount" $
+  --   assertError "Some faces have fewer than 3 points."
+  --               (polyhedron 1 [[(10, 10, 0), (10, -10, 0)],
+  --                              [(10, -10, 0), (-10, -10, 0), (0, 0, 10)],
+  --                              [(-10, -10, 0), (-10, 10, 0), (0, 0, 10)],
+  --                              [(-10, 10, 0), (10, 10, 0), (0, 0, 10)],
+  --                              [(10, -10, 0), (10, 10, 0), (-10, 10, 0)],
+  --                              [(-10, -10, 0), (10, -10, 0), (-10, 10, 0)]])
+  --   ]
   ]
 
 main = defaultMain tests
