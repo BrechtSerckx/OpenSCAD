@@ -1,14 +1,18 @@
 #!/usr/bin/env runghc
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module Main where
 
+import Control.DeepSeq
+import Control.Exception
 import Test.Tasty
 import Test.Tasty.HUnit
-
+import Test.HUnit.Tools
 import Graphics.OpenSCAD
 import Data.Colour (withOpacity)
 
+
+assertError err code =
+  assertRaises "Check error"  (ErrorCall err) . evaluate $ deepseq (show code) ()
 
 sw = concat . words
 st n e a = testCase n $ (sw e) @?=(sw $ render a)
@@ -205,18 +209,16 @@ tests = testGroup "Tests" [
        (var (fa 5) [sphere 2 $ fa 5]),
     st "facet 3" "assign($fs=0.1){sphere(2.0,$fs=0.1);}"
        (var (fs 0.1) [sphere 2 $ fs 0.1])
-    ]
+    ],
 
-  -- testGroup "Errors" [
-  --   testCase "PointCount" $
-  --   assertError "Some faces have fewer than 3 points."
-  --               (polyhedron 1 [[(10, 10, 0), (10, -10, 0)],
-  --                              [(10, -10, 0), (-10, -10, 0), (0, 0, 10)],
-  --                              [(-10, -10, 0), (-10, 10, 0), (0, 0, 10)],
-  --                              [(-10, 10, 0), (10, 10, 0), (0, 0, 10)],
-  --                              [(10, -10, 0), (10, 10, 0), (-10, 10, 0)],
-  --                              [(-10, -10, 0), (10, -10, 0), (-10, 10, 0)]])
-  --   ]
+  testGroup "Errors" [
+    testCase "PointCount" . assertError "Some faces have fewer than 3 points." $
+             polyhedron 1 [[(10, 10, 0), (10, -10, 0)]],
+    testCase "Linearity" . assertError "Some faces have collinear points." $
+             polyhedron 1 [[(0, 0, 0), (1, 0, 0), (2, 0, 0)]],
+    testCase "Planarity" . assertError "Some faces aren't coplanar." $
+             polyhedron 1 [[(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1)]]
+    ]
   ]
 
 main = defaultMain tests

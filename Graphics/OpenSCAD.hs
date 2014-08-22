@@ -129,6 +129,7 @@ import Data.Colour (Colour, AlphaColour, alphaChannel, darken, over, black)
 import Data.Colour.Names as Colours
 import Data.Colour.SRGB (channelRed, channelBlue, channelGreen, toSRGB)
 import Data.List (elemIndices, nub, intercalate)
+import Numeric.Matrix (fromList, rank)
 import System.FilePath (FilePath)
 
 -- A vector in 2 or 3-space. They are used in transformations of
@@ -285,17 +286,28 @@ obCylinder r1 h r2 f= Solid $ ObCylinder r1 h r2 f
 -- 'Vector3d's used in that functions @points@ argument.  The function
 -- will build the appropriate function call, using @faces@ if you pass
 -- in a side that uses more than 3 points, or @triangles@ if not. Note
--- that @faces@ doesn't work in older versions of OpenSCAD, an
--- @triangles@ is depreciate. Until a mechanism to set the version of
+-- that @faces@ doesn't work in older versions of OpenSCAD, and
+-- @triangles@ is depreciated. Until a mechanism to set the version of
 -- OpenSCAD is provided, generating the @faces@ version will cause an
 -- error.
+--
+-- Passing in 'Sides' that have fewer than three points, have
+-- collinear points or have points that aren't in the same plane is an
+-- error that is caught by the library.
 polyhedron ::  Int -> [[Vector3d]] -> Model3d
-polyhedron convexity paths = Solid . Polyhedron convexity points $ sides sin
+polyhedron convexity paths
+  | any collinear paths = error "Some faces have collinear points."
+  | all coplanar paths = Solid . Polyhedron convexity points $ sides sin
+  | otherwise = error "Some faces aren't coplanar."
   where points = nub $ concat paths
         sin = map (concatMap (\p -> elemIndices p points)) paths
         sides ss | any ((> 3) . length) ss  = Faces sin
                  | all ((== 3) . length) ss = Triangles sin
-                 | otherwise = error "All faces must have at least 3 sides."
+                 | otherwise = error "Some faces have fewer than 3 points."
+
+collinear vs = (rank . fromList . toLists) vs <= 1.0
+coplanar vs = length vs == 3 || (rank . fromList . toLists) vs <= 2.0
+toLists ps = map (\(a, b, c) -> [a, b, c]) ps
 
 -- | Transform a 'Model3d' with a 'TransMatrix'
 multMatrix :: TransMatrix -> Model3d -> Model3d
@@ -528,4 +540,3 @@ def = Def
 -- | Use 'diam' to turn a diameter into a radius for circles, spheres, etc.
 diam :: Double -> Double
 diam = (/ 2)
-
