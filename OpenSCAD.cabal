@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                OpenSCAD
-version:             0.2.1.0
+version:             0.2.2.0
 synopsis:            ADT wrapper and renderer for OpenSCAD models.
 description:         An algebraic data type for describing OpenSCAD models,
                      functions to make building such models easier, and
