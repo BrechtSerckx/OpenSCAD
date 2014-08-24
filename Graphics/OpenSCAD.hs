@@ -304,10 +304,9 @@ polyhedron convexity paths
         sides ss | any ((> 3) . length) ss  = Faces sin
                  | all ((== 3) . length) ss = Triangles sin
                  | otherwise = error "Some faces have fewer than 3 points."
-
-collinear vs = (rank . fromList . toLists) vs <= 1.0
-coplanar vs = length vs == 3 || (rank . fromList . toLists) vs <= 2.0
-toLists ps = map (\(a, b, c) -> [a, b, c]) ps
+        collinear vs = (rank . fromList . toLists) vs <= 1.0
+        coplanar vs = length vs == 3 || (rank . fromList . toLists) vs <= 2.0
+        toLists ps = map (\(a, b, c) -> [a, b, c]) ps
 
 -- | Transform a 'Model3d' with a 'TransMatrix'
 multMatrix :: TransMatrix -> Model3d -> Model3d
