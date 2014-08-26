@@ -212,12 +212,20 @@ tests = testGroup "Tests" [
     ],
 
   testGroup "Errors" [
-    testCase "PointCount" . assertError "Some faces have fewer than 3 points." $
-             polyhedron 1 [[(10, 10, 0), (10, -10, 0)]],
-    testCase "Linearity" . assertError "Some faces have collinear points." $
-             polyhedron 1 [[(0, 0, 0), (1, 0, 0), (2, 0, 0)]],
-    testCase "Planarity" . assertError "Some faces aren't coplanar." $
-             polyhedron 1 [[(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1)]]
+    testCase "PolygonPointCount"
+    . assertError "Polygon has fewer than 3 points." $
+        polygon 1 [[(0, 0), (0, 1)]],
+    testCase "PolygonLinearity"
+    . assertError "Points in polygon are collinear." $
+        polygon 1 [[(0, 0), (0, 1), (0, 2)]],
+    testCase "PolyhedronPointCount"
+    . assertError "Some faces have fewer than 3 points." $
+        polyhedron 1 [[(10, 10, 0), (10, -10, 0)]],
+    testCase "PolyhedronLinearity"
+    . assertError "Some faces have collinear points." $
+        polyhedron 1 [[(0, 0, 0), (1, 0, 0), (2, 0, 0)]],
+    testCase "PolyhedronPlanarity" . assertError "Some faces aren't coplanar." $
+        polyhedron 1 [[(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1)]]
     ]
   ]
 

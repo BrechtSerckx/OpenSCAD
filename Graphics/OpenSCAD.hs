@@ -88,6 +88,10 @@ have more points, the new version will be used. If any have fewer than
 three points you get an error. At this time, no tests are done on the
 faces. That will probably change in the future.
 
+Finally, polygon and polyhedron can generate errors on input that
+seems to generate proper solids. If you turn on 'View->Thrown
+Together', you'll see it highlighting errors in the object.
+
 Offset is missing even though it's documented, as it isn't supported
 by a released version of OpenSCAD, so presumably subject to change. It
 is implemented, but untested as yet. You can add it to the module's
@@ -136,18 +140,25 @@ import System.FilePath (FilePath)
 -- 'Model's of their type.
 class Vector a where
   rVector :: a -> String
+  collinear :: [a] -> Bool
+  coplanar :: [a] -> Bool
 
 -- | 'Vector2d' is used where 'Graphics.OpenSCAD' expects an OpenSCAD
 -- @vector@ of length 2.
 type Vector2d = (Double, Double)
 instance Vector Vector2d where
   rVector (x, y) = "[" ++ show x ++ "," ++ show y ++ "]"
+  collinear vs = (rank . fromList . map (\(a, b) -> [a, b])) vs <= 1.0
+  coplanar vs = True
 
 -- | 'Vector3d' is used where 'Graphics.OpenSCAD' expects an OpenSCAD
 -- @vector@ of length 3.
 type Vector3d = (Double, Double, Double)
 instance Vector Vector3d where
   rVector (a, b, c) = "[" ++ show a ++ "," ++ show b ++ "," ++ show c ++ "]"
+  collinear vs = (rank . fromList . map (\(a, b, c) -> [a, b, c])) vs <= 1.0
+  coplanar vs = length vs == 3
+                || (rank . fromList . map (\(a, b, c) -> [a, b, c])) vs <= 2.0
 
 -- | A 4x4 transformation matrix specifying a complete 3-space
 -- transform of a 'Model3d'.
@@ -249,9 +260,13 @@ projection c s = Shape $ Projection c s
 -- that functions points argument.  If you were just going to pass in
 -- the points, it now needs to be in an extra level of 'List'.
 polygon ::  Int -> [[Vector2d]] -> Model2d
-polygon convexity paths = Shape . Polygon convexity points
-                  $ map (concatMap (\p -> elemIndices p points)) paths
-  where points = nub $ concat paths
+polygon convexity paths 
+  | any ((< 3) . length) paths = error "Polygon has fewer than 3 points."
+  | any collinear paths = error "Points in polygon are collinear."
+  | otherwise = let points = nub $ concat paths
+                in Shape . Polygon convexity points
+                   $ map (concatMap (\p -> elemIndices p points)) paths
+
 
 -- | 'offset' a 'Model2d's edges by @offset /delta join/@.
 offset :: Double -> Join -> Model2d -> Model2d
@@ -281,7 +296,7 @@ obCylinder r1 h r2 f= Solid $ ObCylinder r1 h r2 f
 
 -- | Turn a list of list of 'Vector3d's and an int into @polyhedron
 -- /points 'Sides' convexity/@. The argument to polyhedron is the list
--- of paths that is the second argument to the OpenSCAD polygon
+-- of paths that is the second argument to the OpenSCAD polyhedron
 -- function, except the points are 'Vector3d's, not the references to
 -- 'Vector3d's used in that functions @points@ argument.  The function
 -- will build the appropriate function call, using @faces@ if you pass
@@ -304,9 +319,6 @@ polyhedron convexity paths
         sides ss | any ((> 3) . length) ss  = Faces sin
                  | all ((== 3) . length) ss = Triangles sin
                  | otherwise = error "Some faces have fewer than 3 points."
-        collinear vs = (rank . fromList . toLists) vs <= 1.0
-        coplanar vs = length vs == 3 || (rank . fromList . toLists) vs <= 2.0
-        toLists ps = map (\(a, b, c) -> [a, b, c]) ps
 
 -- | Transform a 'Model3d' with a 'TransMatrix'
 multMatrix :: TransMatrix -> Model3d -> Model3d
