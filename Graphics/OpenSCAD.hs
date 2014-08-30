@@ -133,6 +133,7 @@ import Data.Colour (Colour, AlphaColour, alphaChannel, darken, over, black)
 import Data.Colour.Names as Colours
 import Data.Colour.SRGB (channelRed, channelBlue, channelGreen, toSRGB)
 import Data.List (elemIndices, nub, intercalate)
+import qualified Data.Set as Set
 import Numeric.Matrix (fromList, rank)
 import System.FilePath (FilePath)
 
@@ -140,25 +141,34 @@ import System.FilePath (FilePath)
 -- 'Model's of their type.
 class Vector a where
   rVector :: a -> String
-  collinear :: [a] -> Bool
-  coplanar :: [a] -> Bool
+  toLists :: a -> [Double]
+  (#-) :: a -> a -> a -- difference between two vectors 
 
 -- | 'Vector2d' is used where 'Graphics.OpenSCAD' expects an OpenSCAD
 -- @vector@ of length 2.
 type Vector2d = (Double, Double)
 instance Vector Vector2d where
   rVector (x, y) = "[" ++ show x ++ "," ++ show y ++ "]"
-  collinear vs = (rank . fromList . map (\(a, b) -> [a, b])) vs <= 1.0
-  coplanar vs = True
+  toLists (x, y) = [x, y]
+  (x1, y1) #- (x2, y2) = (x1 - x2, y1 - y2)
 
 -- | 'Vector3d' is used where 'Graphics.OpenSCAD' expects an OpenSCAD
 -- @vector@ of length 3.
 type Vector3d = (Double, Double, Double)
 instance Vector Vector3d where
-  rVector (a, b, c) = "[" ++ show a ++ "," ++ show b ++ "," ++ show c ++ "]"
-  collinear vs = (rank . fromList . map (\(a, b, c) -> [a, b, c])) vs <= 1.0
-  coplanar vs = length vs == 3
-                || (rank . fromList . map (\(a, b, c) -> [a, b, c])) vs <= 2.0
+  rVector (x, y, z) = "[" ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]"
+  toLists (x, y, z) = [x, y, z]
+  (x1, y1, z1) #- (x2, y2, z2) = (x1 - x2, y1 - y2, z1 - z2)
+
+-- Cross product only works on 3d vectors.
+(#) :: Vector3d -> Vector3d -> Vector3d
+(x1, y1, z1) # (x2, y2, z2) = (y1 * z2 - z1 * y2,
+                               z1 * x2 - x1 * z2,
+                               x1 * y2 - y1 * x2)
+
+collinear vs = (rank . fromList . map toLists) vs <= 1.0
+coplanar vs = length vs == 3 || (rank . fromList . map toLists) vs <= 2.0
+
 
 -- | A 4x4 transformation matrix specifying a complete 3-space
 -- transform of a 'Model3d'.
@@ -312,12 +322,29 @@ obCylinder r1 h r2 f= Solid $ ObCylinder r1 h r2 f
 polyhedron ::  Int -> [[Vector3d]] -> Model3d
 polyhedron convexity paths
   | any collinear paths = error "Some faces have collinear points."
-  | all coplanar paths = Solid . Polyhedron convexity points $ sides sin
-  | otherwise = error "Some faces aren't coplanar."
-  where points = nub $ concat paths
-        sin = map (concatMap (\p -> elemIndices p points)) paths
-        sides ss | any ((> 3) . length) ss  = Faces sin
-                 | all ((== 3) . length) ss = Triangles sin
+  | any (not . coplanar) paths = error "Some faces aren't coplanar."
+  | length vectors /= length (nub vectors) =
+    error "Some faces have different orientation."
+  | 2 * length edges /= length vectors = error "Some edges are not in two faces."
+  | xCross headMax xMax tailMax > 0 =
+    error "Face orientations are counterclockwise."
+  | otherwise = Solid . Polyhedron convexity points $ sides sidesIn
+  where vectors = concatMap (\p -> zip p (tail p ++ [head p])) paths
+        edges = nub $ map (Set.fromList . \(a, b) -> [a, b]) vectors
+        points = nub $ concat paths
+        xMax = maximum points
+        faceMax = head $ filter (elem xMax) paths
+        (maxFirst, maxLast) = break (== xMax) faceMax
+        (headMax, tailMax)  = (if null maxFirst
+                                  then last maxLast
+                                  else last maxFirst,
+                               if null (tail maxLast)
+                                  then head maxFirst
+                                  else head (tail maxLast))
+        xCross a b c  = (\(a, b, c) -> a) $ (a #- b) # (b #- c)
+        sidesIn = map (concatMap (\p -> elemIndices p points)) paths
+        sides ss | any ((> 3) . length) ss  = Faces ss
+                 | all ((== 3) . length) ss = Triangles ss
                  | otherwise = error "Some faces have fewer than 3 points."
 
 -- | Transform a 'Model3d' with a 'TransMatrix'
