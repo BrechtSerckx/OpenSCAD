@@ -15,7 +15,7 @@ assertError err code =
   assertRaises "Check error"  (ErrorCall err) . evaluate $ deepseq (show code) ()
 
 sw = concat . words
-st n e a = testCase n $ (sw e) @?=(sw $ render a)
+st n e a = testCase n $ (sw $ render a) @?= (sw e)
 
 
 {- About the test result values.
@@ -32,26 +32,26 @@ that they are testing does.
 tests = testGroup "Tests" [
   testGroup "3d-primitives" [
      testGroup "Spheres" [
-        st "1" "sphere(1.0);"         (sphere 1 def),
+        st "1" "sphere(1.0);"       $ sphere 1 def,
         st "2" "sphere(2.0,$fn=100);" (sphere 2 $ fn 100),
         st "3" "sphere(2.0,$fa=5.0);" (sphere 2 $ fa 5),
         st "4" "sphere(2.0,$fs=0.1);" (sphere 2 $ fs 0.1)
         ],
 
      testGroup "Boxes" [
-       st "box"  "cube([1.0,2.0,3.0]);" (box 1 2 3),
-       st "cube" "cube([2.0,2.0,2.0]);" (cube 2)
+       st "box"  "cube([1.0,2.0,3.0]);" $ box 1 2 3,
+       st "cube" "cube([2.0,2.0,2.0]);" $ cube 2
        ],
 
      testGroup "Cylinders" [
-       st "1" "cylinder(r=1.0,h=2.0);"          (cylinder 1 2 def),
+       st "1" "cylinder(r=1.0,h=2.0);"         $ cylinder 1 2 def,
        st "2" "cylinder(r=1.0,h=2.0,$fs=0.6);"  (cylinder 1 2 $ fs 0.6),
        st "3" "cylinder(r=1.0,h=2.0,$fn=10);"   (cylinder 1 2 $ fn 10),
        st "4" "cylinder(r=1.0,h=2.0,$fa=30.0);" (cylinder 1 2 $ fa 30)
        ],
 
      testGroup "Oblique-Cylinders" [
-       st "1" "cylinder(r1=1.0,h=2.0,r2=2.0);"  (obCylinder 1 2 2 def),
+       st "1" "cylinder(r1=1.0,h=2.0,r2=2.0);" $ obCylinder 1 2 2 def,
        st "2" "cylinder(r1=1.0,h=2.0,r2=2.0,$fs=0.6);"
           (obCylinder 1 2 2 $ fs 0.6),
        st "3" "cylinder(r1=1.0,h=2.0,r2=2.0,$fn=10);"
@@ -63,22 +63,21 @@ tests = testGroup "Tests" [
      testGroup "Misc" [
        st "import" "import(\"test.stl\");" (solid $ importFile "test.stl"),
        st "polyhedron 1"
-          "polyhedron(points=[[10.0,10.0,0.0],[10.0,-10.0,0.0],[0.0,0.0,10.0],[-10.0,-10.0,0.0],[-10.0,10.0,0.0]],triangles=[[0,1,2],[1,3,2],[3,4,2],[4,0,2],[1,0,4],[3,1,4]],convexity=1);"
-          (polyhedron 1 [[(10, 10, 0), (10, -10, 0), (0, 0, 10)],
-                         [(10, -10, 0), (-10, -10, 0), (0, 0, 10)],
-                         [(-10, -10, 0), (-10, 10, 0), (0, 0, 10)],
-                         [(-10, 10, 0), (10, 10, 0), (0, 0, 10)],
-                         [(10, -10, 0), (10, 10, 0), (-10, 10, 0)],
-                         [(-10, -10, 0), (10, -10, 0), (-10, 10, 0)]]),
+          "polyhedron(points=[[10.0,10.0,0.0],[10.0,-10.0,0.0],[0.0,0.0,10.0],[-10.0,-10.0,0.0],[-10.0,10.0,0.0]],triangles=[[0,1,2],[1,3,2],[3,4,2],[4,0,2],[1,0,4],[3,1,4]],convexity=1);" $
+          polyhedron 1 [[(10, 10, 0), (10, -10, 0), (0, 0, 10)],
+                        [(10, -10, 0), (-10, -10, 0), (0, 0, 10)],
+                        [(-10, -10, 0), (-10, 10, 0), (0, 0, 10)],
+                        [(-10, 10, 0), (10, 10, 0), (0, 0, 10)],
+                        [(10, -10, 0), (10, 10, 0), (-10, 10, 0)],
+                        [(-10, -10, 0), (10, -10, 0), (-10, 10, 0)]],
        st "polyhedron 2"
-       "polyhedron(points=[[10.0,10.0,0.0],[10.0,-10.0,0.0],[0.0,0.0,10.0],[-10.0,-10.0,0.0],[-10.0,10.0,0.0]],faces=[[0,1,2],[1,3,2],[3,4,2],[4,0,2],[0,1,3,4]],convexity=1);"
-          (polyhedron 1 [[(10, 10, 0), (10, -10, 0), (0, 0, 10)],
-                         [(10, -10, 0), (-10, -10, 0), (0, 0, 10)],
-                         [(-10, -10, 0), (-10, 10, 0), (0, 0, 10)],
-                         [(-10, 10, 0), (10, 10, 0), (0, 0, 10)],
-                         [(10, 10, 0), (10, -10, 0), (-10, -10, 0), (-10, 10, 0)]])
+          "polyhedron(points=[[10.0,10.0,0.0],[10.0,-10.0,0.0],[0.0,0.0,10.0],[-10.0,-10.0,0.0],[-10.0,10.0,0.0]],faces=[[0,1,2],[1,3,2],[3,4,2],[4,0,2],[4,3,1,0]],convexity=1);" $
+          polyhedron 1 [[(10, 10, 0), (10, -10, 0), (0, 0, 10)],
+                        [(10, -10, 0), (-10, -10, 0), (0, 0, 10)],
+                        [(-10, -10, 0), (-10, 10, 0), (0, 0, 10)],
+                        [(-10, 10, 0), (10, 10, 0), (0, 0, 10)],
+                        [(-10, 10, 0), (-10, -10, 0), (10, -10, 0), (10, 10, 0)]]
        ],
-
      testGroup "Linear-Extrusion" [
        st "1" 
           "linear_extrude(height=10.0,twist=0.0,scale=[1.0,1.0],slices=10,convexity=10)circle(1.0);"
@@ -117,20 +116,20 @@ tests = testGroup "Tests" [
        ],
 
      testGroup "Surface" [
-       st "Normal" "surface(file=\"test.dat\",convexity=5);"
-          (surface "test.dat" False 5),
-       st "Inverted" "surface(file=\"test.dat\",invert=true,convexity=5);"
-          (surface "test.dat" True 5)	-- Requires  2014.QX
+       st "Normal" "surface(file=\"test.dat\",convexity=5);" $
+          surface "test.dat" False 5,
+       st "Inverted" "surface(file=\"test.dat\",invert=true,convexity=5);" $
+          surface "test.dat" True 5	-- Requires  2014.QX
        ]
      ],
      
   testGroup "2d-primitives" [
     testGroup "Squares" [
-       st "rectangle" "square([2.0,3.0]);"   (rectangle 2 3),
-       st "square"    "square([2.0,2.0]);"   (square 2)
+       st "rectangle" "square([2.0,3.0]);" $ rectangle 2 3,
+       st "square"    "square([2.0,2.0]);" $ square 2
        ],
     testGroup "Circles" [
-      st "1" "circle(1.0);"         (circle 1 def),
+      st "1" "circle(1.0);"        $ circle 1 def,
       st "2" "circle(2.0,$fn=100);" (circle 2 $ fn 100),
       st "3" "circle(2.0,$fa=5.0);" (circle 2 $ fa 5),
       st "4" "circle(2.0,$fs=0.1);" (circle 2 $ fs 0.1)
@@ -138,8 +137,8 @@ tests = testGroup "Tests" [
     testGroup "Misc" [
       st "import" "import(\"test.dxf\");"   (solid $ importFile "test.dxf"),
       st "polygon"
-         "polygon(points=[[0.0,0.0],[100.0,0.0],[0.0,100.0],[10.0,10.0],[80.0,10.0],[10.0,80.0]],paths=[[0,1,2],[3,4,5]],convexity=10);"
-         (polygon 10 [[(0,0),(100,0),(0,100)],[(10,10),(80,10),(10,80)]]),
+         "polygon(points=[[0.0,0.0],[100.0,0.0],[0.0,100.0],[10.0,10.0],[80.0,10.0],[10.0,80.0]],paths=[[0,1,2],[3,4,5]],convexity=10);" $
+         polygon 10 [[(0,0),(100,0),(0,100)],[(10,10),(80,10),(10,80)]],
       st "projection"
          "projection(cut=false)scale([10.0,10.0,10.0])difference(){translate([0.0,0.0,1.0])cube([1.0,1.0,1.0]);translate([0.25,0.25,0.0])cube([0.5,0.5,3.0]);}"
          (projection False . scale (10, 10, 10) . difference (up 1 (cube 1))
@@ -212,20 +211,44 @@ tests = testGroup "Tests" [
     ],
 
   testGroup "Errors" [
-    testCase "PolygonPointCount"
+    testCase "Polygon Pointcount"
     . assertError "Polygon has fewer than 3 points." $
         polygon 1 [[(0, 0), (0, 1)]],
-    testCase "PolygonLinearity"
+    testCase "Polygon Linearity"
     . assertError "Points in polygon are collinear." $
         polygon 1 [[(0, 0), (0, 1), (0, 2)]],
-    testCase "PolyhedronPointCount"
-    . assertError "Some faces have fewer than 3 points." $
-        polyhedron 1 [[(10, 10, 0), (10, -10, 0)]],
-    testCase "PolyhedronLinearity"
+    testCase "Polyhedron Linearity"
     . assertError "Some faces have collinear points." $
         polyhedron 1 [[(0, 0, 0), (1, 0, 0), (2, 0, 0)]],
-    testCase "PolyhedronPlanarity" . assertError "Some faces aren't coplanar." $
-        polyhedron 1 [[(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1)]]
+    testCase "Polyhedron Planarity" . assertError "Some faces aren't coplanar." $
+        polyhedron 1 [[(10, 10, 0), (10, -10, 0), (0, 10, 10)],
+                        [(10, -10, 0), (-10, -10, 0), (0, 0, 10)],
+                        [(-10, -10, 0), (-10, 10, 0), (0, 0, 10)],
+                        [(-10, 10, 0), (10, 10, 0), (0, 0, 10)],
+                        [(-10, 10, 0), (-10, -10, 0), (10, -10, 0), (0, 0, -10)]],
+    testCase "Polyhedron Edges" . assertError "Some edges are not in two faces." $
+        polyhedron 1 [[(10, 10, 0), (10, -10, 0), (0, 0, 10)],
+                      [(10, -10, 0), (-10, -10, 0), (0, 0, 10)],
+                      [(-10, -10, 0), (-10, 10, 0), (0, 0, 10)],
+                      [(-10, 10, 0), (10, 10, 0), (0, 0, 10)],
+                      [(10, -10, 0), (10, 10, 0), (-10, 10, 0)],
+                      [(-10, -10, 0), (10, -10, 0), (-10, 20, 0)]],
+    testCase "Polyhedron Faces"
+    . assertError "Some faces have different orientation." $
+        polyhedron 1 [[(10, 10, 0), (10, -10, 0), (0, 0, 10)],
+                      [(10, -10, 0), (-10, -10, 0), (0, 0, 10)],
+                      [(-10, -10, 0), (-10, 10, 0), (0, 0, 10)],
+                      [(-10, 10, 0), (10, 10, 0), (0, 0, 10)],
+                      [(10, -10, 0), (10, 10, 0), (-10, 10, 0)],
+                      [(10, -10, 0), (-10, -10, 0), (-10, 10, 0)]],
+    testCase "Polyhedron Orientation"
+    . assertError "Face orientations are counterclockwise." $
+        polyhedron 1 [[(10, -10, 0), (10, 10, 0), (0, 0, 10)],
+                      [(-10, -10, 0), (10, -10, 0), (0, 0, 10)],
+                      [(-10, 10, 0), (-10, -10, 0), (0, 0, 10)],
+                      [(10, 10, 0), (-10, 10, 0), (0, 0, 10)],
+                      [(10, 10, 0), (10, -10, 0), (-10, 10, 0)],
+                      [(10, -10, 0), (-10, -10, 0), (-10, 10, 0)]]
     ]
   ]
 
