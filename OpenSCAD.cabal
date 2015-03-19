@@ -2,12 +2,12 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                OpenSCAD
-version:             0.2.0.0
+version:             0.2.1.0
 synopsis:            ADT wrapper and renderer for OpenSCAD models.
 description:         An algebraic data type for describing OpenSCAD models,
                      functions to make building such models easier, and
                      functions for rendering an ADT into an OpenSCAD program.
-homepage:            https://graphics-openscad.googlecode.com/
+homepage:            https://chiselapp.com/user/mwm/repository/OpenSCAD/
 license:             BSD3
 license-file:        LICENSE
 author:              Mike Meyer
@@ -33,10 +33,10 @@ Test-Suite Units
   default-language:    Haskell2010
 
 source-repository head
-  type:           hg
-  location:       https://code.google.com/p/graphics-openscad/
+  type:           fossil
+  location:       https://chiselapp.com/user/mwm/repository/OpenSCAD/
 
 source-repository this
-  type:           hg
-  location:       https://code.google.com/p/graphics-openscad/
-  tag:            0.2
+  type:           fossil
+  location:       https://chiselapp.com/user/mwm/repository/OpenSCAD/
+  tag:            0.2.1
