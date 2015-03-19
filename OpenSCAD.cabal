@@ -15,7 +15,7 @@ maintainer:          mwm@mired.org
 -- copyright:           
 category:            Graphics
 build-type:          Simple
-extra-source-files:
+extra-source-files:  README.md
 cabal-version:       >=1.10
 
 library
