@@ -129,6 +129,9 @@ import Data.Colour (Colour, AlphaColour, alphaChannel, darken, over, black)
 import Data.Colour.Names as Colours
 import Data.Colour.SRGB (channelRed, channelBlue, channelGreen, toSRGB)
 import Data.List (elemIndices, nub, intercalate)
+import Data.List.NonEmpty (toList)
+import Data.Monoid (Monoid, mempty, mappend, mconcat)
+import Data.Semigroup (Semigroup, (<>), sconcat)
 import System.FilePath (FilePath)
 
 -- A vector in 2 or 3-space. They are used in transformations of
@@ -263,7 +266,7 @@ sphere r f = Solid $ Sphere r f
 
 -- | Create a box with @cube /x-size y-size z-size/@
 box :: Double -> Double -> Double -> Model3d
-box x y z= Solid $ Box x y z
+box x y z = Solid $ Box x y z
 
 -- | A convenience function for creating a cube as a 'box' with all
 -- sides the same length.
@@ -529,3 +532,15 @@ def = Def
 diam :: Double -> Double
 diam = (/ 2)
 
+-- Now, let Haskell work it's magic
+instance Vector v => Semigroup (Model v) where
+  a <> b = union [a, b]
+  sconcat = union . toList
+
+instance Vector v => Monoid (Model v) where
+  mempty = Solid $ Box 0 0 0
+  mappend a b = union [a, b]
+  mconcat = union
+
+infixl 8 #
+(#) = flip ($)
