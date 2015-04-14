@@ -11,6 +11,7 @@ Stability   : experimental
 
 module Graphics.OpenSCAD.Unicode where
 
+import Data.Semigroup ((<>))
 import Graphics.OpenSCAD
 
 infixl 6 ∪
@@ -22,7 +23,7 @@ infixl 9 ∆
 --
 -- U+222A, UNION
 (∪) :: Vector v => Model v -> Model v -> Model v
-a ∪ b = union [a, b]
+(∪) = (<>)
 
 -- | (&#x2229;) = 'intersection'
 --

@@ -24,5 +24,5 @@ to issue an error message, please open an issue here.
 ## More info
 
 Read the
-[online docs](https://hackage.haskell.org/package/OpenSCAD-0.1.0.0/docs/Graphics-OpenSCAD.html)
+[online docs](https://hackage.haskell.org/package/OpenSCAD-0.2.1.0/docs/Graphics-OpenSCAD.html)
 at [hackage](http://hackage.haskell.org/).

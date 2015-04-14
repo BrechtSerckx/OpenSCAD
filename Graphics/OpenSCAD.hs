@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances,	FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 
 {- |
 Module      : Graphics.OpenSCAD
@@ -124,7 +124,7 @@ module Graphics.OpenSCAD (
   -- ** 'Facet's.
   var, fn, fs, fa, def,
   -- ** General convenience functions
-  diam, draw, drawL,
+  diam, draw, drawL, (#),
   module Colours)
 
 where
@@ -133,6 +133,8 @@ import Data.Colour (Colour, AlphaColour, alphaChannel, darken, over, black)
 import Data.Colour.Names as Colours
 import Data.Colour.SRGB (channelRed, channelBlue, channelGreen, toSRGB)
 import Data.List (elemIndices, nub, intercalate)
+import Data.List.NonEmpty (toList)
+import Data.Semigroup (Semigroup((<>), sconcat), Monoid(mconcat, mempty, mappend))
 import qualified Data.Set as Set
 import Numeric.Matrix (fromList, rank)
 import System.FilePath (FilePath)
@@ -161,10 +163,10 @@ instance Vector Vector3d where
   (x1, y1, z1) #- (x2, y2, z2) = (x1 - x2, y1 - y2, z1 - z2)
 
 -- Cross product only works on 3d vectors.
-(#) :: Vector3d -> Vector3d -> Vector3d
-(x1, y1, z1) # (x2, y2, z2) = (y1 * z2 - z1 * y2,
-                               z1 * x2 - x1 * z2,
-                               x1 * y2 - y1 * x2)
+(#*) :: Vector3d -> Vector3d -> Vector3d
+(x1, y1, z1) #* (x2, y2, z2) = (y1 * z2 - z1 * y2,
+                                z1 * x2 - x1 * z2,
+                                x1 * y2 - y1 * x2)
 
 collinear vs = (rank . fromList . map toLists) vs <= 1.0
 coplanar vs = length vs == 3 || (rank . fromList . map toLists) vs <= 2.0
@@ -275,8 +277,7 @@ polygon convexity paths
   | any collinear paths = error "Points in polygon are collinear."
   | otherwise = let points = nub $ concat paths
                 in Shape . Polygon convexity points
-                   $ map (concatMap (\p -> elemIndices p points)) paths
-
+                   $ map (concatMap (`elemIndices` points)) paths
 
 -- | 'offset' a 'Model2d's edges by @offset /delta join/@.
 offset :: Double -> Join -> Model2d -> Model2d
@@ -289,7 +290,7 @@ sphere r f = Solid $ Sphere r f
 
 -- | Create a box with @cube /x-size y-size z-size/@
 box :: Double -> Double -> Double -> Model3d
-box x y z= Solid $ Box x y z
+box x y z = Solid $ Box x y z
 
 -- | A convenience function for creating a cube as a 'box' with all
 -- sides the same length.
@@ -341,8 +342,8 @@ polyhedron convexity paths
                                if null (tail maxLast)
                                   then head maxFirst
                                   else head (tail maxLast))
-        xCross a b c  = (\(a, b, c) -> a) $ (a #- b) # (b #- c)
-        sidesIn = map (concatMap (\p -> elemIndices p points)) paths
+        xCross a b c  = (\(a, b, c) -> a) $ (a #- b) #* (b #- c)
+        sidesIn = map (concatMap (`elemIndices` points)) paths
         sides ss | any ((> 3) . length) ss  = Faces ss
                  | all ((== 3) . length) ss = Triangles ss
                  | otherwise = error "Some faces have fewer than 3 points."
@@ -515,12 +516,12 @@ rSolid (Surface f i c) =
 rSolid (ToSolid s) = render s
 
 -- render a list of vectors as an Openscad vector of vectors.
-rVectorL vs = "[" ++ (intercalate "," $ map rVector vs) ++ "]"
+rVectorL vs = "[" ++ intercalate "," (map rVector vs) ++ "]"
 
 -- render a Sides.
 rSides (Faces vs) = ",faces=" ++ rListL vs
 rSides (Triangles vs) = ",triangles=" ++ rListL vs
-rListL vs = "[" ++ (intercalate "," $ map show vs) ++ "]"
+rListL vs = "[" ++ intercalate "," (map show vs) ++ "]"
 
 -- | A convenience function to render a list of 'Model's by taking
 -- their union.
@@ -578,3 +579,17 @@ def = Def
 -- | Use 'diam' to turn a diameter into a radius for circles, spheres, etc.
 diam :: Double -> Double
 diam = (/ 2)
+-- Now, let Haskell work it's magic
+instance Vector v => Semigroup (Model v) where
+  a <> b = union [a, b]
+  sconcat = union . toList
+
+instance Vector v => Monoid (Model v) where
+  mempty = Solid $ Box 0 0 0
+  mappend a b = union [a, b]
+  mconcat = union
+
+-- | You can use '(#)' to write transformations in a more readable postfix form, 
+--   cube 3 # color red # translate (-3, -3, -3)
+infixl 8 #
+(#) = flip ($)
