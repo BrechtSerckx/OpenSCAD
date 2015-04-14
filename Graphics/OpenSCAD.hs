@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances,	FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 
 {- |
 Module      : Graphics.OpenSCAD
@@ -120,7 +120,7 @@ module Graphics.OpenSCAD (
   -- ** 'Facet's.
   var, fn, fs, fa, def,
   -- ** General convenience functions
-  diam, draw, drawL,
+  diam, draw, drawL, (#),
   module Colours)
 
 where
@@ -130,8 +130,7 @@ import Data.Colour.Names as Colours
 import Data.Colour.SRGB (channelRed, channelBlue, channelGreen, toSRGB)
 import Data.List (elemIndices, nub, intercalate)
 import Data.List.NonEmpty (toList)
-import Data.Monoid (Monoid, mempty, mappend, mconcat)
-import Data.Semigroup (Semigroup, (<>), sconcat)
+import Data.Semigroup (Semigroup((<>), sconcat), Monoid(mconcat, mempty, mappend))
 import System.FilePath (FilePath)
 
 -- A vector in 2 or 3-space. They are used in transformations of
@@ -252,7 +251,7 @@ projection c s = Shape $ Projection c s
 -- the points, it now needs to be in an extra level of 'List'.
 polygon ::  Int -> [[Vector2d]] -> Model2d
 polygon convexity paths = Shape . Polygon convexity points
-                  $ map (concatMap (\p -> elemIndices p points)) paths
+                  $ map (concatMap (`elemIndices` points)) paths
   where points = nub $ concat paths
 
 -- | 'offset' a 'Model2d's edges by @offset /delta join/@.
@@ -295,7 +294,7 @@ obCylinder r1 h r2 f= Solid $ ObCylinder r1 h r2 f
 polyhedron ::  Int -> [[Vector3d]] -> Model3d
 polyhedron convexity paths = Solid . Polyhedron convexity points $ sides sin
   where points = nub $ concat paths
-        sin = map (concatMap (\p -> elemIndices p points)) paths
+        sin = map (concatMap (`elemIndices` points)) paths
         sides ss | any ((> 3) . length) ss  = Faces sin
                  | all ((== 3) . length) ss = Triangles sin
                  | otherwise = error "All faces must have at least 3 sides."
@@ -468,12 +467,12 @@ rSolid (Surface f i c) =
 rSolid (ToSolid s) = render s
 
 -- render a list of vectors as an Openscad vector of vectors.
-rVectorL vs = "[" ++ (intercalate "," $ map rVector vs) ++ "]"
+rVectorL vs = "[" ++ intercalate "," (map rVector vs) ++ "]"
 
 -- render a Sides.
 rSides (Faces vs) = ",faces=" ++ rListL vs
 rSides (Triangles vs) = ",triangles=" ++ rListL vs
-rListL vs = "[" ++ (intercalate "," $ map show vs) ++ "]"
+rListL vs = "[" ++ intercalate "," (map show vs) ++ "]"
 
 -- | A convenience function to render a list of 'Model's by taking
 -- their union.
@@ -542,5 +541,7 @@ instance Vector v => Monoid (Model v) where
   mappend a b = union [a, b]
   mconcat = union
 
+-- | You can use '(#)' to write transformations in a more readable postfix form, 
+--   cube 3 # color red # translate (-3, -3, -3)
 infixl 8 #
 (#) = flip ($)

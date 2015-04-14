@@ -8,6 +8,8 @@ import Test.Framework.Providers.HUnit
 
 import Graphics.OpenSCAD
 import Data.Colour (withOpacity)
+import Data.List.NonEmpty (fromList)
+import Data.Semigroup (sconcat)
 
 sw = concat . words
 st n e a = testCase n $ (sw e) @=?(sw $ render a)
@@ -203,6 +205,48 @@ tests = [
        (var (fa 5) [sphere 2 $ fa 5]),
     st "facet 3" "assign($fs=0.1){sphere(2.0,$fs=0.1);}"
        (var (fs 0.1) [sphere 2 $ fs 0.1])
+    ],
+
+
+  testGroup "Combinations" [
+    st "union" "union(){cube([1.0,1.0,1.0]);sphere(1.1,$fs=0.1);}"
+       (union [cube 1, sphere 1.1 $ fs 0.1]),
+    st "difference" "difference(){cube([1.0,1.0,1.0]);sphere(1.1,$fs=0.1);}"
+       (difference (cube 1) . sphere 1.1 $ fs 0.1),
+    st "intersection" "intersection(){cube([1.0,1.0,1.0]);sphere(1.1,$fs=0.1);}"
+       (intersection [cube 1, sphere 1.1 $ fs 0.1]),
+    st "minkowski"
+       "minkowski(){cube([10.0,10.0,10.0]);cylinder(r=2.0,h=1.1,$fn=50);}"
+       (minkowski [cube 10, cylinder 2 1.1 $ fn 50]),
+    st "hull" "hull(){translate([15.0,10.0])circle(10.0);circle(10.0);}"
+       (hull [circle 10 def # translate (15, 10), circle 10 def])
+    ],
+
+  testGroup "Haskell" [
+    st "# 3d" "translate([-3.0,-3.0,-3.0])color([1.0,0.0,0.0])cube([3.0,3.0,3.0]);"
+       (cube 3 # color red # translate (-3, -3, -3)),
+    st "# 2d"
+       "translate([3.0,3.0])color([1.0,0.6470588235294119,0.0])square([2.0,2.0]);"
+       (square 2 # color orange # translate (3, 3)),
+    st "Monoid 1 3d" "union(){cube([1.0,1.0,1.0]);sphere(1.1,$fs=0.1);}"
+       (cube 1 <> sphere 1.1 (fs 0.1)),
+    st "Monoid 1 2d" "union(){square([1.0,1.0]);circle(1.1,$fs=0.1);}"
+       (square 1 <> circle 1.1 (fs 0.1)),
+    st "Monoid 2 3d" "union(){cube([1.0,1.0,1.0]);sphere(1.1,$fs=0.1);}"
+       (mconcat [cube 1, sphere 1.1 $ fs 0.1]),
+    st "Monoid 2 2d" "union(){square([1.0,1.0]);circle(1.1,$fs=0.1);}"
+       (mconcat [square 1, circle 1.1 $ fs 0.1]),
+    st "Semigroup 1 3d" "cube([0.0,0.0,0.0]);" (solid mempty),
+    -- should we export a "shape" function?
+    st "Semigroup 1 2d" "cube([0.0,0.0,0.0]);" (mempty :: Model2d),
+    st "Semigroup 2 3d" "union(){cube([1.0,1.0,1.0]);sphere(1.1,$fs=0.1);}"
+       (mappend (cube 1) $ sphere 1.1 (fs 0.1)),
+    st "Semigroup 2 2d" "union(){square([1.0,1.0]);circle(1.1,$fs=0.1);}"
+       (mappend (square 1) $ circle 1.1 (fs 0.1)),
+    st "Semigroup 3 3d" "union(){cube([1.0,1.0,1.0]);sphere(1.1,$fs=0.1);}"
+       (sconcat $ fromList [cube 1, sphere 1.1 $ fs 0.1]),
+    st "Semigroup 3 2d" "union(){square([1.0,1.0]);circle(1.1,$fs=0.1);}"
+       (sconcat $ fromList [square 1, circle 1.1 $ fs 0.1])
     ]
   ]
 
