@@ -141,10 +141,22 @@ import System.FilePath (FilePath)
 
 -- A vector in 2 or 3-space. They are used in transformations of
 -- 'Model's of their type.
-class Vector a where
+class Eq a => Vector a where
   rVector :: a -> String
   toLists :: a -> [Double]
-  (#-) :: a -> a -> a -- difference between two vectors 
+  (#-) :: a -> a -> a      -- difference between two vectors 
+  (#*) :: a -> a -> a	   -- cross product	
+
+  isZero :: a -> Bool      -- is a zero vector. Arguably should use eps.
+  isZero = all (== 0) . toLists
+
+  collinear :: [a] -> Bool -- are all points collinear?
+  collinear [] = False
+  collinear [_] = False
+  collinear [v1, v2] = v1 /= v2
+  collinear (v1:v2:vs)
+    | v1 /= v2  = all (\v -> isZero $ (v2 #- v1) #* (v1 #- v)) vs
+    | otherwise = collinear (v2:vs)
 
 -- | 'Vector2d' is used where 'Graphics.OpenSCAD' expects an OpenSCAD
 -- @vector@ of length 2.
@@ -153,6 +165,7 @@ instance Vector Vector2d where
   rVector (x, y) = "[" ++ show x ++ "," ++ show y ++ "]"
   toLists (x, y) = [x, y]
   (x1, y1) #- (x2, y2) = (x1 - x2, y1 - y2)
+  (x1, y1) #* (x2, y2) = (0, x1 * y2 - y1 * x2) -- for purposes of collinear
 
 -- | 'Vector3d' is used where 'Graphics.OpenSCAD' expects an OpenSCAD
 -- @vector@ of length 3.
@@ -161,14 +174,11 @@ instance Vector Vector3d where
   rVector (x, y, z) = "[" ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]"
   toLists (x, y, z) = [x, y, z]
   (x1, y1, z1) #- (x2, y2, z2) = (x1 - x2, y1 - y2, z1 - z2)
+  (x1, y1, z1) #* (x2, y2, z2) = (y1 * z2 - z1 * y2,
+                                  z1 * x2 - x1 * z2,
+                                  x1 * y2 - y1 * x2)
 
--- Cross product only works on 3d vectors.
-(#*) :: Vector3d -> Vector3d -> Vector3d
-(x1, y1, z1) #* (x2, y2, z2) = (y1 * z2 - z1 * y2,
-                                z1 * x2 - x1 * z2,
-                                x1 * y2 - y1 * x2)
 
-collinear vs = (rank . fromList . map toLists) vs <= 1.0
 coplanar vs = length vs == 3 || (rank . fromList . map toLists) vs <= 2.0
 
 
@@ -322,8 +332,9 @@ obCylinder r1 h r2 f= Solid $ ObCylinder r1 h r2 f
 -- error that is caught by the library.
 polyhedron ::  Int -> [[Vector3d]] -> Model3d
 polyhedron convexity paths
-  | any collinear paths = error "Some faces have collinear points."
-  | any (not . coplanar) paths = error "Some faces aren't coplanar."
+  | any ((< 3) . length) paths = error "Some face has fewer than 3 points."
+  | any collinear paths = error "Some face has collinear points."
+  | any (not . coplanar) paths = error "Some face isn't coplanar."
   | length vectors /= length (nub vectors) =
     error "Some faces have different orientation."
   | 2 * length edges /= length vectors = error "Some edges are not in two faces."
