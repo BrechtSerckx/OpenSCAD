@@ -133,22 +133,24 @@ import Data.Colour (Colour, AlphaColour, alphaChannel, darken, over, black)
 import Data.Colour.Names as Colours
 import Data.Colour.SRGB (channelRed, channelBlue, channelGreen, toSRGB)
 import Data.List (elemIndices, nub, intercalate)
-import Data.List.NonEmpty (toList)
+import qualified Data.List.NonEmpty as NE
 import Data.Semigroup (Semigroup((<>), sconcat), Monoid(mconcat, mempty, mappend))
 import qualified Data.Set as Set
-import Numeric.Matrix (fromList, rank)
 import System.FilePath (FilePath)
 
 -- A vector in 2 or 3-space. They are used in transformations of
 -- 'Model's of their type.
 class Eq a => Vector a where
   rVector :: a -> String
-  toLists :: a -> [Double]
-  (#-) :: a -> a -> a      -- difference between two vectors 
+  toList :: a -> [Double]
   (#*) :: a -> a -> a	   -- cross product	
+  (#-) :: a -> a -> a      -- difference between two vectors 
+
+  (#.) :: a -> a -> Double -- dot product
+  v1 #. v2 = sum $ zipWith (*) (toList v1) (toList v2)
 
   isZero :: a -> Bool      -- is a zero vector. Arguably should use eps.
-  isZero = all (== 0) . toLists
+  isZero = all (== 0) . toList
 
   collinear :: [a] -> Bool -- are all points collinear?
   collinear [] = False
@@ -163,7 +165,7 @@ class Eq a => Vector a where
 type Vector2d = (Double, Double)
 instance Vector Vector2d where
   rVector (x, y) = "[" ++ show x ++ "," ++ show y ++ "]"
-  toLists (x, y) = [x, y]
+  toList (x, y) = [x, y]
   (x1, y1) #- (x2, y2) = (x1 - x2, y1 - y2)
   (x1, y1) #* (x2, y2) = (0, x1 * y2 - y1 * x2) -- for purposes of collinear
 
@@ -172,14 +174,19 @@ instance Vector Vector2d where
 type Vector3d = (Double, Double, Double)
 instance Vector Vector3d where
   rVector (x, y, z) = "[" ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]"
-  toLists (x, y, z) = [x, y, z]
+  toList (x, y, z) = [x, y, z]
   (x1, y1, z1) #- (x2, y2, z2) = (x1 - x2, y1 - y2, z1 - z2)
   (x1, y1, z1) #* (x2, y2, z2) = (y1 * z2 - z1 * y2,
                                   z1 * x2 - x1 * z2,
                                   x1 * y2 - y1 * x2)
 
-
-coplanar vs = length vs == 3 || (rank . fromList . map toLists) vs <= 2.0
+-- Coplanar only makes sense for R3, so it's not part of the Vector class
+coplanar :: [Vector3d] -> Bool
+coplanar vs | length vs <= 3        = True -- by definition
+            | collinear $ take 3 vs = coplanar $ tail vs
+            | otherwise =
+                all (\v -> (v3 #- v1) #. ((v2 #- v1) #* (v #- v3)) == 0) vs'
+                where (v1:v2:v3:vs') = vs
 
 
 -- | A 4x4 transformation matrix specifying a complete 3-space
@@ -593,7 +600,7 @@ diam = (/ 2)
 -- Now, let Haskell work it's magic
 instance Vector v => Semigroup (Model v) where
   a <> b = union [a, b]
-  sconcat = union . toList
+  sconcat = union . NE.toList
 
 instance Vector v => Monoid (Model v) where
   mempty = Solid $ Box 0 0 0
