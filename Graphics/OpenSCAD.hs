@@ -168,7 +168,7 @@ instance Vector Vector3d where
                                 z1 * x2 - x1 * z2,
                                 x1 * y2 - y1 * x2)
 
-collinear vs = (rank . fromList . map toLists) vs <= 1.0
+colinear vs = (rank . fromList . map toLists) vs <= 1.0
 coplanar vs = length vs == 3 || (rank . fromList . map toLists) vs <= 2.0
 
 
@@ -274,7 +274,7 @@ projection c s = Shape $ Projection c s
 polygon ::  Int -> [[Vector2d]] -> Model2d
 polygon convexity paths 
   | any ((< 3) . length) paths = error "Polygon has fewer than 3 points."
-  | any collinear paths = error "Points in polygon are collinear."
+  | any colinear paths = error "Points in polygon are colinear."
   | otherwise = let points = nub $ concat paths
                 in Shape . Polygon convexity points
                    $ map (concatMap (`elemIndices` points)) paths
@@ -318,11 +318,11 @@ obCylinder r1 h r2 f= Solid $ ObCylinder r1 h r2 f
 -- error.
 --
 -- Passing in 'Sides' that have fewer than three points, have
--- collinear points or have points that aren't in the same plane is an
+-- colinear points or have points that aren't in the same plane is an
 -- error that is caught by the library.
 polyhedron ::  Int -> [[Vector3d]] -> Model3d
 polyhedron convexity paths
-  | any collinear paths = error "Some faces have collinear points."
+  | any colinear paths = error "Some faces have colinear points."
   | any (not . coplanar) paths = error "Some faces aren't coplanar."
   | length vectors /= length (nub vectors) =
     error "Some faces have different orientation."
