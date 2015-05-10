@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 {- |
 Module      : Graphics.OpenSCAD
