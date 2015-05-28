@@ -108,7 +108,7 @@ module Graphics.OpenSCAD (
   Model2d, Model3d, Vector2d, Vector3d,
   --  ** Other type aliases
   Facet, TransMatrix,
-  -- ** Types for the unsafe operations
+  -- ** Type for 'unsafePolyhedron' 'Sides' argument
   Sides(..),
   -- * Primitive creation
   -- ** 'Model2d's
@@ -220,6 +220,7 @@ data Shape = Rectangle Double Double
            | Offset Double Join Shape
            deriving Show
 
+-- | The third argument to unsafePolyhedron is a 'Sides'.
 data Sides = Faces [[Int]] | Triangles [[Int]] deriving Show
 
 -- A 'Solid' is a 3-dimensional primitive to be used in a 'Model3d'.
