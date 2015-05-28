@@ -108,11 +108,13 @@ module Graphics.OpenSCAD (
   Model2d, Model3d, Vector2d, Vector3d,
   --  ** Other type aliases
   Facet, TransMatrix,
+  -- ** Types for the unsafe operations
+  Sides(..),
   -- * Primitive creation
   -- ** 'Model2d's
-  rectangle, square, circle, polygon, projection, importFile,
+  rectangle, square, circle, polygon, unsafePolygon, projection, importFile,
   -- ** 'Model3d's
-  sphere, box, cube, cylinder, obCylinder, polyhedron,
+  sphere, box, cube, cylinder, obCylinder, polyhedron, unsafePolyhedron,
   multMatrix, linearExtrude, rotateExtrude, surface, solid,
   -- * Functions
   -- ** Combinations
@@ -283,7 +285,7 @@ projection :: Bool -> Model3d -> Model2d
 projection c s = Shape $ Projection c s
 
 -- | Turn a list of lists of 'Vector2d's and an Int into @polygon
--- /points path convexity/@. The argument to polygon is the list of
+-- /convexity points path/@. The argument to polygon is the list of
 -- paths that is the second argument to the OpenSCAD polygon function,
 -- except the points are 'Vector2d's, not references to 'Vector2d's in
 -- that functions points argument.  If you were just going to pass in
@@ -295,6 +297,14 @@ polygon convexity paths
   | otherwise = let points = nub $ concat paths
                 in Shape . Polygon convexity points
                    $ map (concatMap (`elemIndices` points)) paths
+
+-- | This provides direct access to the OpenScad @polygon@ command for
+-- performance reasons. This version uses the OpenSCAD arguments:
+-- @polygon /convexity points path/@ to allow client code to save
+-- space.  However, it bypasses all the checks done by
+-- 'polygon', which need the other representation.
+unsafePolygon :: Int -> [Vector2d] -> [[Int]] -> Model2d
+unsafePolygon convexity points paths = Shape $ Polygon convexity points paths
 
 -- | 'offset' a 'Model2d's edges by @offset /delta join/@.
 offset :: Double -> Join -> Model2d -> Model2d
@@ -323,7 +333,7 @@ obCylinder :: Double -> Double -> Double -> Facet -> Model Vector3d
 obCylinder r1 h r2 f= Solid $ ObCylinder r1 h r2 f
 
 -- | Turn a list of list of 'Vector3d's and an int into @polyhedron
--- /points 'Sides' convexity/@. The argument to polyhedron is the list
+-- /convexity points 'Sides'/@. The argument to polyhedron is the list
 -- of paths that is the second argument to the OpenSCAD polyhedron
 -- function, except the points are 'Vector3d's, not the references to
 -- 'Vector3d's used in that functions @points@ argument.  The function
@@ -365,6 +375,15 @@ polyhedron convexity paths
         sides ss | any ((> 3) . length) ss  = Faces ss
                  | all ((== 3) . length) ss = Triangles ss
                  | otherwise = error "Some faces have fewer than 3 points."
+
+-- | This provides direct access to the OpenSCAD @polyhedron@ command
+-- for performance reasons.  This version uses the OpenSCAD arguments:
+-- @polyhedron /convexity points 'Sides'/@ to allow client code to
+-- save space. However, it bypasses all the checks done by
+-- 'polyhedron', which needs the other representation.
+unsafePolyhedron :: Int -> [Vector3d] -> Sides -> Model3d
+unsafePolyhedron convexity points sides = Solid $ Polyhedron convexity points sides
+
 
 -- | Transform a 'Model3d' with a 'TransMatrix'
 multMatrix :: TransMatrix -> Model3d -> Model3d
