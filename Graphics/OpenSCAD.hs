@@ -16,7 +16,7 @@ as a string, and some utilities. The primary goal is that the output
 should always be valid OpenSCAD. If you manage to generate OpenSCAD
 source that causes OpenSCAD to complain, please open an issue.
 
-The primary affect of this is that Graphics.OpenSCAD distinguishes
+The primary effect of this is that Graphics.OpenSCAD distinguishes
 between 2d and 3d 'Model's. If you want to mix them, you must
 explicitly convert between them.  While two-dimensional model creation
 could be polymorphic functions that create either, so that such models
@@ -143,8 +143,8 @@ import System.FilePath (FilePath)
 class Eq a => Vector a where
   rVector :: a -> String
   toList :: a -> [Double]
-  (#*) :: a -> a -> a	   -- cross product	
-  (#-) :: a -> a -> a      -- difference between two vectors 
+  (#*) :: a -> a -> a      -- cross product
+  (#-) :: a -> a -> a      -- difference between two vectors
 
   (#.) :: a -> a -> Double -- dot product
   v1 #. v2 = sum $ zipWith (*) (toList v1) (toList v2)
@@ -282,14 +282,14 @@ circle r f = Shape $ Circle r f
 projection :: Bool -> Model3d -> Model2d
 projection c s = Shape $ Projection c s
 
--- | Turn a list of list of 'Vector2d's and an int into @polygon
+-- | Turn a list of lists of 'Vector2d's and an Int into @polygon
 -- /points path convexity/@. The argument to polygon is the list of
 -- paths that is the second argument to the OpenSCAD polygon function,
 -- except the points are 'Vector2d's, not references to 'Vector2d's in
 -- that functions points argument.  If you were just going to pass in
 -- the points, it now needs to be in an extra level of 'List'.
 polygon ::  Int -> [[Vector2d]] -> Model2d
-polygon convexity paths 
+polygon convexity paths
   | any ((< 3) . length) paths = error "Polygon has fewer than 3 points."
   | any collinear paths = error "Points in polygon are collinear."
   | otherwise = let points = nub $ concat paths
@@ -430,12 +430,12 @@ color :: Vector v => Colour Double -> Model v -> Model v
 color = Color
 
 -- | Render a 'Model' in a transparent color. This uses the
--- 'Data.Coulor.AphaColour' color model.
+-- 'Data.Colour.AlphaColour' color model.
 transparent :: Vector v => AlphaColour Double -> Model v -> Model v
 transparent = Transparent
 
 -- | A 'translate' that just goes up, since those seem to be common.
-up :: Double -> Model3d -> Model3d 
+up :: Double -> Model3d -> Model3d
 up f = translate (0, 0, f)
 
 
@@ -607,7 +607,7 @@ instance Vector v => Monoid (Model v) where
   mappend a b = union [a, b]
   mconcat = union
 
--- | You can use '(#)' to write transformations in a more readable postfix form, 
+-- | You can use '(#)' to write transformations in a more readable postfix form,
 --   cube 3 # color red # translate (-3, -3, -3)
 infixl 8 #
 (#) = flip ($)
