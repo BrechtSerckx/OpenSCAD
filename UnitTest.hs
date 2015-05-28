@@ -282,6 +282,8 @@ tests = testGroup "Tests" [
        (mconcat [cube 1, sphere 1.1 $ fs 0.1]),
     st "Monoid 2 2d" "union(){square([1.0,1.0]);circle(1.1,$fs=0.1);}"
        (mconcat [square 1, circle 1.1 $ fs 0.1]),
+    st "Monoid 3 3d" "sphere(1.1,$fs=0.1);" (mconcat [sphere 1.1 $ fs 0.1]),
+    st "Monoid 3 2d" "square([1.0,1.0]);" (mconcat [square 1]),
     st "Semigroup 1 3d" "cube([0.0,0.0,0.0]);" (solid mempty),
     -- should we export a "shape" function?
     st "Semigroup 1 2d" "cube([0.0,0.0,0.0]);" (mempty :: Model2d),

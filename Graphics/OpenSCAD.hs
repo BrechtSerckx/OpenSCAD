@@ -604,8 +604,12 @@ instance Vector v => Semigroup (Model v) where
 
 instance Vector v => Monoid (Model v) where
   mempty = Solid $ Box 0 0 0
+  mappend (Solid (Box 0 0 0)) b = b
+  mappend a (Solid (Box 0 0 0)) = a
   mappend a b = union [a, b]
-  mconcat = union
+  mconcat [a] = a
+  mconcat as = union as
+
 
 -- | You can use '(#)' to write transformations in a more readable postfix form,
 --   cube 3 # color red # translate (-3, -3, -3)
