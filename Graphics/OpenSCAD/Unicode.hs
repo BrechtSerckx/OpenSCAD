@@ -17,7 +17,8 @@ import Graphics.OpenSCAD
 infixl 6 ∪
 infixr 6 ∩
 infixl 9 ∖
-infixl 9 ∆
+infixl 9 ⊖
+infixl 9 ⊕
 
 -- | (&#x222A;) = 'union'
 --
@@ -37,9 +38,14 @@ a ∩ b = intersection [a, b]
 (∖):: Vector v => Model v -> Model v -> Model v
 (∖) = difference
 
--- | (&#x2206;) = Symmetric difference
+-- | (&#x2296;) = Symmetric difference
 --
--- U+2206, INCREMENT
-(∆) :: Vector v => Model v -> Model v -> Model v
-a ∆ b = (a ∖ b) ∪ (b ∖ a)
+-- U+2296, CIRCLED MINUS
+(⊖) :: Vector v => Model v -> Model v -> Model v
+a ⊖ b = (a ∖ b) ∪ (b ∖ a)
 
+-- | (&#2295;) = 'minkowski'
+--
+-- U+2295, CIRCLED PLUS
+(⊕) :: Vector v => Model v -> Model v -> Model v
+a ⊕ b = minkowski [a, b]
