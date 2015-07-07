@@ -53,5 +53,5 @@ source-repository head
 
 source-repository this
   type:           fossil
-  location:       https://code.google.com/p/graphics-openscad/
-  tag:            0.3.0.1
+  location:       https://chiselapp.com/user/mwm/repository/OpenSCAD/
+  tag:            0.3.0.2
