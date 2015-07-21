@@ -11,7 +11,7 @@ Stability   : experimental
 
 module Graphics.OpenSCAD.Unicode where
 
-import Data.Semigroup ((<>))
+import Data.Monoid ((<>))
 import Graphics.OpenSCAD
 
 infixl 6 ∪

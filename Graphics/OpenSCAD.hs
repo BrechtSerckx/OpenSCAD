@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances #-}
+ {-# LANGUAGE FlexibleInstances #-}
 
 {- |
 Module      : Graphics.OpenSCAD
@@ -136,7 +136,7 @@ import Data.Colour.Names as Colours
 import Data.Colour.SRGB (channelRed, channelBlue, channelGreen, toSRGB)
 import Data.List (elemIndices, nub, intercalate)
 import qualified Data.List.NonEmpty as NE
-import Data.Semigroup (Semigroup((<>), sconcat), Monoid(mconcat, mempty, mappend))
+import Data.Monoid ((<>), Monoid, mconcat, mempty, mappend)
 import qualified Data.Set as Set
 import System.FilePath (FilePath)
 
@@ -617,11 +617,8 @@ def = Def
 -- | Use 'diam' to turn a diameter into a radius for circles, spheres, etc.
 diam :: Double -> Double
 diam = (/ 2)
--- Now, let Haskell work it's magic
-instance Vector v => Semigroup (Model v) where
-  a <> b = union [a, b]
-  sconcat = union . NE.toList
 
+-- Now, let Haskell work it's magic
 instance Vector v => Monoid (Model v) where
   mempty = Solid $ Box 0 0 0
   mappend (Solid (Box 0 0 0)) b = b

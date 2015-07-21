@@ -10,7 +10,7 @@ import Test.HUnit.Tools
 import Graphics.OpenSCAD
 import Data.Colour (withOpacity)
 import Data.List.NonEmpty (fromList)
-import Data.Semigroup (Semigroup((<>), sconcat), Monoid(mconcat, mempty, mappend))
+import Data.Monoid ((<>), Monoid,mconcat, mempty, mappend)
 
 
 
@@ -294,17 +294,12 @@ tests = testGroup "Tests" [
        (mconcat [square 1, circle 1.1 $ fs 0.1]),
     st "Monoid 3 3d" "sphere(1.1,$fs=0.1);" (mconcat [sphere 1.1 $ fs 0.1]),
     st "Monoid 3 2d" "square([1.0,1.0]);" (mconcat [square 1]),
-    st "Semigroup 1 3d" "cube([0.0,0.0,0.0]);" (solid mempty),
-    -- should we export a "shape" function?
-    st "Semigroup 1 2d" "cube([0.0,0.0,0.0]);" (mempty :: Model2d),
-    st "Semigroup 2 3d" "union(){cube([1.0,1.0,1.0]);sphere(1.1,$fs=0.1);}"
+    st "Monoid 4 3d" "cube([0.0,0.0,0.0]);" (solid mempty),
+    st "Monoid 4 2d" "cube([0.0,0.0,0.0]);" (mempty :: Model2d),
+    st "Monoid 5 3d" "union(){cube([1.0,1.0,1.0]);sphere(1.1,$fs=0.1);}"
        (mappend (cube 1) $ sphere 1.1 (fs 0.1)),
-    st "Semigroup 2 2d" "union(){square([1.0,1.0]);circle(1.1,$fs=0.1);}"
-       (mappend (square 1) $ circle 1.1 (fs 0.1)),
-    st "Semigroup 3 3d" "union(){cube([1.0,1.0,1.0]);sphere(1.1,$fs=0.1);}"
-       (sconcat $ fromList [cube 1, sphere 1.1 $ fs 0.1]),
-    st "Semigroup 3 2d" "union(){square([1.0,1.0]);circle(1.1,$fs=0.1);}"
-       (sconcat $ fromList [square 1, circle 1.1 $ fs 0.1])
+    st "Monoid 5 2d" "union(){square([1.0,1.0]);circle(1.1,$fs=0.1);}"
+       (mappend (square 1) $ circle 1.1 (fs 0.1))
     ]
   ]
 
