@@ -15,9 +15,13 @@ import Data.Monoid ((<>))
 import Graphics.OpenSCAD
 
 infixl 6 ∪
+
 infixr 6 ∩
+
 infixl 9 ∖
+
 infixl 9 ⊖
+
 infixl 9 ⊕
 
 -- | (&#x222A;) = 'union'
@@ -35,7 +39,7 @@ a ∩ b = intersection [a, b]
 -- | (&#x2216;) = 'difference'
 --
 -- U+2216, SET MINUS
-(∖):: Vector v => Model v -> Model v -> Model v
+(∖) :: Vector v => Model v -> Model v -> Model v
 (∖) = difference
 
 -- | (&#x2296;) = Symmetric difference

@@ -12,6 +12,7 @@ in project.shellFor {
     cabal = "3.2.0.0";
     hlint = "3.2.8";
     ghcid = "0.8.7";
+    ormolu = "0.1.4.1";
   };
 
   buildInputs = with (import sources.nixpkgs { }); [ nixfmt ];

@@ -1,143 +1,193 @@
- {-# LANGUAGE FlexibleContexts #-}
- {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 
-{- |
-Module      : Graphics.OpenSCAD
-Description : Type-checked wrappers for the OpenSCAD primitives.
-Copyright   : &#xa9; Mike Meyer, 2014
-License     : BSD4
-Maintainer  : mwm@mired.org
-Stability   : experimental
+-- |
+-- Module      : Graphics.OpenSCAD
+-- Description : Type-checked wrappers for the OpenSCAD primitives.
+-- Copyright   : &#xa9; Mike Meyer, 2014
+-- License     : BSD4
+-- Maintainer  : mwm@mired.org
+-- Stability   : experimental
+--
+-- = Overview
+--
+-- The Graphics.OpenSCAD module provides abstract data types for creating
+-- OpenSCAD model definitions calls, along with a function to render it
+-- as a string, and some utilities. The primary goal is that the output
+-- should always be valid OpenSCAD. If you manage to generate OpenSCAD
+-- source that causes OpenSCAD to complain, please open an issue.
+--
+-- The primary effect of this is that Graphics.OpenSCAD distinguishes
+-- between 2d and 3d 'Model's. If you want to mix them, you must
+-- explicitly convert between them.  While two-dimensional model creation
+-- could be polymorphic functions that create either, so that such models
+-- could be treated as either 2d or 3d, you'd still have to explicitly
+-- convert models whose type was fixed as 2d by a transformation, and
+-- 'render' wouldn't work if the type was still ambiguous, ala @render $
+-- square 2@.
+--
+-- = Usage
+--
+-- Standard usage is to have a @main@ function that looks like:
+--
+-- @
+-- main = draw $ /Solid/
+-- @
+-- or
+-- @
+-- main = drawL $ [/Solid/]
+-- @
+--
+-- and then set your IDE's compile command to use @runhaskell@ or
+-- equivalent to run your code and send the output to a .scad file. Open
+-- that file in OpenSCAD, and set it to automatically reload if the file
+-- changes. Recompiling your program will cause the model to be loaded
+-- and displayed by OpenSCAD.
+--
+-- The type constructors are not exported, with functions being exported
+-- in their stead.  This allows extra checking to be done on those that
+-- need it.  It also provides consistency, as otherwise you'd have to
+-- remember whether 'box' is a constructor or a convenience function,
+-- etc.
+--
+-- Because of this, the constructors are not documented, the exported
+-- functions are. The documentation is generally just the corresponding
+-- OpenSCAD function name, along with the names of the arguments from the
+-- OpenSCAD documentation. If no OpenSCAD function name is given, then
+-- it's the same as the 'Graphics.OpenSCAD' function. You should check
+-- the OpenSCAD documentation for usage information.
+--
+-- = Oddities
+--
+-- 'importFile' has been left polymorphic. I couldn't find a sane way to
+-- check that you're importing the right file type, so detecting such
+-- errors - including importing a 3d file and trying to extrude it - have
+-- to be left up to OpenSCAD in any case.  So for now, there's just
+-- 'importFile'. This does create the oddity that if you import a file
+-- and try and render it without doing something to indicate how many
+-- dimensions it has (one of the transformations, an extrusion or
+-- projection, or 'solid') you'll get a compile error because the type is
+-- ambiguous. Later, this may turn into @import2d@ and @import3d@.
+--
+-- The interfaces for 'polygon's and 'polyhedron's is seriously different
+-- from the OpenSCAD interface. Rather than expecting you to enter a list
+-- of points and then references to them, you just enter the points
+-- directly. If you really want to do it the OpenSCAD way, you can do
+-- something like:
+--
+-- @
+-- draw $ polyhedron [[(p 0, p 1, p 2), (p 0, p 2, p 3), ... ]]
+-- where points = [.....]
+--       p i = points !! i
+-- @
+--
+-- Also, the OpenSCAD polyedron code recently changed. The old version
+-- requires that the faces all be triangles, the new version allows for
+-- them to be arbitrary polygons. 'Graphics.OpenSCAD' supports both: if
+-- all your faces are triangles, it will use the old version. If some
+-- have more points, the new version will be used. If any have fewer than
+-- three points you get an error. At this time, no tests are done on the
+-- faces. That will probably change in the future.
+--
+-- Finally, polygon and polyhedron can generate errors on input that
+-- seems to generate proper solids. If you turn on 'View->Thrown
+-- Together', you'll see it highlighting errors in the object.
+--
+-- Offset is missing even though it's documented, as it isn't supported
+-- by a released version of OpenSCAD, so presumably subject to change. It
+-- is implemented, but untested as yet. You can add it to the module's
+-- export lists if you want to play with it.
+module Graphics.OpenSCAD
+  ( -- * Types
 
-= Overview
+    -- ** A 'Model' to be rendered, and a 'Vector' that fixes the
 
-The Graphics.OpenSCAD module provides abstract data types for creating
-OpenSCAD model definitions calls, along with a function to render it
-as a string, and some utilities. The primary goal is that the output
-should always be valid OpenSCAD. If you manage to generate OpenSCAD
-source that causes OpenSCAD to complain, please open an issue.
+    -- number of dimensions it has.
+    Model,
+    Vector,
 
-The primary effect of this is that Graphics.OpenSCAD distinguishes
-between 2d and 3d 'Model's. If you want to mix them, you must
-explicitly convert between them.  While two-dimensional model creation
-could be polymorphic functions that create either, so that such models
-could be treated as either 2d or 3d, you'd still have to explicitly
-convert models whose type was fixed as 2d by a transformation, and
-'render' wouldn't work if the type was still ambiguous, ala @render $
-square 2@.
+    -- ** Types aliases with fixed dimensions
+    Model2d,
+    Model3d,
+    Vector2d,
+    Vector3d,
+    --  ** Other type aliases
+    Facet,
+    TransMatrix,
 
-= Usage
+    -- ** Type for 'unsafePolyhedron' 'Sides' argument
+    Sides (..),
 
-Standard usage is to have a @main@ function that looks like:
+    -- * Primitive creation
 
-@
-main = draw $ /Solid/
-@
-or
-@
-main = drawL $ [/Solid/]
-@
+    -- ** 'Model2d's
+    rectangle,
+    square,
+    circle,
+    polygon,
+    unsafePolygon,
+    projection,
+    importFile,
 
-and then set your IDE's compile command to use @runhaskell@ or
-equivalent to run your code and send the output to a .scad file. Open
-that file in OpenSCAD, and set it to automatically reload if the file
-changes. Recompiling your program will cause the model to be loaded
-and displayed by OpenSCAD.
+    -- ** 'Model3d's
+    sphere,
+    box,
+    cube,
+    cylinder,
+    obCylinder,
+    polyhedron,
+    unsafePolyhedron,
+    multMatrix,
+    linearExtrude,
+    rotateExtrude,
+    surface,
+    solid,
 
-The type constructors are not exported, with functions being exported
-in their stead.  This allows extra checking to be done on those that
-need it.  It also provides consistency, as otherwise you'd have to
-remember whether 'box' is a constructor or a convenience function,
-etc.
+    -- * Functions
 
-Because of this, the constructors are not documented, the exported
-functions are. The documentation is generally just the corresponding
-OpenSCAD function name, along with the names of the arguments from the
-OpenSCAD documentation. If no OpenSCAD function name is given, then
-it's the same as the 'Graphics.OpenSCAD' function. You should check
-the OpenSCAD documentation for usage information.
+    -- ** Combinations
+    union,
+    intersection,
+    difference,
+    minkowski,
+    hull,
 
-= Oddities
+    -- ** Transformations
+    scale,
+    resize,
+    rotate,
+    translate,
+    mirror,
+    color,
+    transparent,
+    up,
 
-'importFile' has been left polymorphic. I couldn't find a sane way to
-check that you're importing the right file type, so detecting such
-errors - including importing a 3d file and trying to extrude it - have
-to be left up to OpenSCAD in any case.  So for now, there's just
-'importFile'. This does create the oddity that if you import a file
-and try and render it without doing something to indicate how many
-dimensions it has (one of the transformations, an extrusion or
-projection, or 'solid') you'll get a compile error because the type is
-ambiguous. Later, this may turn into @import2d@ and @import3d@.
+    -- ** Rendering
+    render,
+    renderL,
 
-The interfaces for 'polygon's and 'polyhedron's is seriously different
-from the OpenSCAD interface. Rather than expecting you to enter a list
-of points and then references to them, you just enter the points
-directly. If you really want to do it the OpenSCAD way, you can do
-something like:
+    -- ** 'Facet's.
+    var,
+    fn,
+    fs,
+    fa,
+    def,
 
-@
-draw $ polyhedron [[(p 0, p 1, p 2), (p 0, p 2, p 3), ... ]]
-where points = [.....]
-      p i = points !! i
-@
-
-Also, the OpenSCAD polyedron code recently changed. The old version
-requires that the faces all be triangles, the new version allows for
-them to be arbitrary polygons. 'Graphics.OpenSCAD' supports both: if
-all your faces are triangles, it will use the old version. If some
-have more points, the new version will be used. If any have fewer than
-three points you get an error. At this time, no tests are done on the
-faces. That will probably change in the future.
-
-Finally, polygon and polyhedron can generate errors on input that
-seems to generate proper solids. If you turn on 'View->Thrown
-Together', you'll see it highlighting errors in the object.
-
-Offset is missing even though it's documented, as it isn't supported
-by a released version of OpenSCAD, so presumably subject to change. It
-is implemented, but untested as yet. You can add it to the module's
-export lists if you want to play with it.
-
--}
-
-module Graphics.OpenSCAD (
-  -- * Types
-  -- ** A 'Model' to be rendered, and a 'Vector' that fixes the
-  -- number of dimensions it has.
-  Model, Vector,
-  -- ** Types aliases with fixed dimensions
-  Model2d, Model3d, Vector2d, Vector3d,
-  --  ** Other type aliases
-  Facet, TransMatrix,
-  -- ** Type for 'unsafePolyhedron' 'Sides' argument
-  Sides(..),
-  -- * Primitive creation
-  -- ** 'Model2d's
-  rectangle, square, circle, polygon, unsafePolygon, projection, importFile,
-  -- ** 'Model3d's
-  sphere, box, cube, cylinder, obCylinder, polyhedron, unsafePolyhedron,
-  multMatrix, linearExtrude, rotateExtrude, surface, solid,
-  -- * Functions
-  -- ** Combinations
-  union, intersection, difference, minkowski, hull,
-  -- ** Transformations
-  scale, resize, rotate, translate, mirror, color, transparent, up,
-  -- ** Rendering
-  render, renderL,
-  -- ** 'Facet's.
-  var, fn, fs, fa, def,
-  -- ** General convenience functions
-  diam, draw, drawL, (#),
-  module Colours)
-
+    -- ** General convenience functions
+    diam,
+    draw,
+    drawL,
+    (#),
+    module Colours,
+  )
 where
 
-import Data.Colour (Colour, AlphaColour, alphaChannel, darken, over, black)
+import Data.Colour (AlphaColour, Colour, alphaChannel, black, darken, over)
 import Data.Colour.Names as Colours
-import Data.Colour.SRGB (channelRed, channelBlue, channelGreen, toSRGB)
-import Data.List (elemIndices, nub, intercalate)
+import Data.Colour.SRGB (channelBlue, channelGreen, channelRed, toSRGB)
+import Data.List (elemIndices, intercalate, nub)
 import qualified Data.List.NonEmpty as NE
-import Data.Monoid ((<>), Monoid, mconcat, mempty, mappend)
+import Data.Monoid (Monoid, mappend, mconcat, mempty, (<>))
 import qualified Data.Set as Set
 import System.FilePath (FilePath)
 
@@ -146,26 +196,27 @@ import System.FilePath (FilePath)
 class Eq a => Vector a where
   rVector :: a -> String
   toList :: a -> [Double]
-  (#*) :: a -> a -> a      -- cross product
-  (#-) :: a -> a -> a      -- difference between two vectors
+  (#*) :: a -> a -> a -- cross product
+  (#-) :: a -> a -> a -- difference between two vectors
 
   (#.) :: a -> a -> Double -- dot product
   v1 #. v2 = sum $ zipWith (*) (toList v1) (toList v2)
 
-  isZero :: a -> Bool      -- is a zero vector. Arguably should use eps.
+  isZero :: a -> Bool -- is a zero vector. Arguably should use eps.
   isZero = all (== 0) . toList
 
   collinear :: [a] -> Bool -- are all points collinear?
   collinear [] = False
   collinear [_] = False
   collinear [v1, v2] = v1 /= v2
-  collinear (v1:v2:vs)
-    | v1 /= v2  = all (\v -> isZero $ (v2 #- v1) #* (v1 #- v)) vs
-    | otherwise = collinear (v2:vs)
+  collinear (v1 : v2 : vs)
+    | v1 /= v2 = all (\v -> isZero $ (v2 #- v1) #* (v1 #- v)) vs
+    | otherwise = collinear (v2 : vs)
 
 -- | 'Vector2d' is used where 'Graphics.OpenSCAD' expects an OpenSCAD
 -- @vector@ of length 2.
 type Vector2d = (Double, Double)
+
 instance Vector Vector2d where
   rVector (x, y) = "[" ++ show x ++ "," ++ show y ++ "]"
   toList (x, y) = [x, y]
@@ -175,29 +226,35 @@ instance Vector Vector2d where
 -- | 'Vector3d' is used where 'Graphics.OpenSCAD' expects an OpenSCAD
 -- @vector@ of length 3.
 type Vector3d = (Double, Double, Double)
+
 instance Vector Vector3d where
   rVector (x, y, z) = "[" ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]"
   toList (x, y, z) = [x, y, z]
   (x1, y1, z1) #- (x2, y2, z2) = (x1 - x2, y1 - y2, z1 - z2)
-  (x1, y1, z1) #* (x2, y2, z2) = (y1 * z2 - z1 * y2,
-                                  z1 * x2 - x1 * z2,
-                                  x1 * y2 - y1 * x2)
+  (x1, y1, z1) #* (x2, y2, z2) =
+    ( y1 * z2 - z1 * y2,
+      z1 * x2 - x1 * z2,
+      x1 * y2 - y1 * x2
+    )
 
 -- Coplanar only makes sense for R3, so it's not part of the Vector class
 coplanar :: [Vector3d] -> Bool
-coplanar vs | length vs <= 3        = True -- by definition
-            | collinear $ take 3 vs = coplanar $ tail vs
-            | otherwise =
-                all (\v -> (v3 #- v1) #. ((v2 #- v1) #* (v #- v3)) == 0) vs'
-                where (v1:v2:v3:vs') = vs
-
+coplanar vs
+  | length vs <= 3 = True -- by definition
+  | collinear $ take 3 vs = coplanar $ tail vs
+  | otherwise =
+    all (\v -> (v3 #- v1) #. ((v2 #- v1) #* (v #- v3)) == 0) vs'
+  where
+    (v1 : v2 : v3 : vs') = vs
 
 -- | A 4x4 transformation matrix specifying a complete 3-space
 -- transform of a 'Model3d'.
 type TransMatrix =
-  ((Double, Double, Double, Double), (Double, Double, Double, Double),
-   (Double, Double, Double, Double), (Double, Double, Double, Double))
-
+  ( (Double, Double, Double, Double),
+    (Double, Double, Double, Double),
+    (Double, Double, Double, Double),
+    (Double, Double, Double, Double)
+  )
 
 -- While it's tempting to add more options to Solid, Shape or Model,
 -- don't do it. Instead, add functions that add that functionality,
@@ -207,58 +264,61 @@ type TransMatrix =
 -- control the mesh used during generation of circular objects. They
 -- appear as arguments to various constructors, as well as in the
 -- 'var' function to set them for the argument objects.
-data Facet = Fa Double | Fs Double | Fn Int | Def deriving Show
+data Facet = Fa Double | Fs Double | Fn Int | Def deriving (Show)
 
 -- | A 'Join' controls how edges in a 'polygon' are joined by the
 -- 'offset' operation.
-data Join = Bevel | Round | Miter Double deriving Show
+data Join = Bevel | Round | Miter Double deriving (Show)
 
 -- A 'Shape' is a 2-dimensional primitive to be used in a 'Model2d'.
-data Shape = Rectangle Double Double
-           | Circle Double Facet
-           | Polygon Int [Vector2d] [[Int]]
-           | Projection Bool Model3d
-           | Offset Double Join Shape
-           deriving Show
+data Shape
+  = Rectangle Double Double
+  | Circle Double Facet
+  | Polygon Int [Vector2d] [[Int]]
+  | Projection Bool Model3d
+  | Offset Double Join Shape
+  deriving (Show)
 
 -- | The third argument to unsafePolyhedron is a 'Sides'.
-data Sides = Faces [[Int]] | Triangles [[Int]] deriving Show
+data Sides = Faces [[Int]] | Triangles [[Int]] deriving (Show)
 
 -- A 'Solid' is a 3-dimensional primitive to be used in a 'Model3d'.
-data Solid = Sphere Double Facet
-           | Box Double Double Double
-           | Cylinder Double Double Facet
-           | ObCylinder Double Double Double Facet
-           | Polyhedron Int [Vector3d] Sides
-           | MultMatrix TransMatrix Model3d
-           | LinearExtrude Double Double Vector2d Int Int Facet Model2d
-           | RotateExtrude Int Facet Model2d
-           | Surface FilePath Bool Int
-           | ToSolid Model2d
-           deriving Show
+data Solid
+  = Sphere Double Facet
+  | Box Double Double Double
+  | Cylinder Double Double Facet
+  | ObCylinder Double Double Double Facet
+  | Polyhedron Int [Vector3d] Sides
+  | MultMatrix TransMatrix Model3d
+  | LinearExtrude Double Double Vector2d Int Int Facet Model2d
+  | RotateExtrude Int Facet Model2d
+  | Surface FilePath Bool Int
+  | ToSolid Model2d
+  deriving (Show)
 
 -- | A 'Model' is either a 'Model2d', a 'Model3d', a transformation of
 -- a 'Model', a combination of 'Model's, or a 'Model' with it's
 -- rendering tweaked by a 'Facet'. 'Model's can be rendered.
-data Model v = Shape Shape
-             | Solid Solid
-             | Scale v (Model v)
-             | Resize v (Model v)
-             | Rotate v (Model v)
-             | Translate v (Model v)
-             | Mirror v (Model v)
-             | Color (Colour Double) (Model v)
-             | Transparent (AlphaColour Double) (Model v)
-             -- and combinations
-             | Union [Model v]
-             | Intersection [Model v]
-             | Minkowski [Model v]
-             | Hull [Model v]
-             | Difference (Model v) (Model v)
-             -- And oddball stuff control
-             | Import FilePath
-             | Var Facet [Model v]
-             deriving Show
+data Model v
+  = Shape Shape
+  | Solid Solid
+  | Scale v (Model v)
+  | Resize v (Model v)
+  | Rotate v (Model v)
+  | Translate v (Model v)
+  | Mirror v (Model v)
+  | Color (Colour Double) (Model v)
+  | Transparent (AlphaColour Double) (Model v)
+  | -- and combinations
+    Union [Model v]
+  | Intersection [Model v]
+  | Minkowski [Model v]
+  | Hull [Model v]
+  | Difference (Model v) (Model v)
+  | -- And oddball stuff control
+    Import FilePath
+  | Var Facet [Model v]
+  deriving (Show)
 
 -- | A two-dimensional model. Note that the types do not mix
 -- implicitly. You must turn a 'Model2d' into a 'Model3d' using one of
@@ -270,6 +330,7 @@ type Model2d = Model Vector2d
 type Model3d = Model Vector3d
 
 -- Tools for creating 'Model2d's.
+
 -- | Create a rectangular 'Model2d' with @rectangle /x-size y-size/@.
 rectangle :: Double -> Double -> Model2d
 rectangle w h = Shape $ Rectangle w h
@@ -292,13 +353,14 @@ projection c s = Shape $ Projection c s
 -- except the points are 'Vector2d's, not references to 'Vector2d's in
 -- that functions points argument.  If you were just going to pass in
 -- the points, it now needs to be in an extra level of 'List'.
-polygon ::  Int -> [[Vector2d]] -> Model2d
+polygon :: Int -> [[Vector2d]] -> Model2d
 polygon convexity paths
   | any ((< 3) . length) paths = error "Polygon has fewer than 3 points."
   | any collinear paths = error "Points in polygon are collinear."
-  | otherwise = let points = nub $ concat paths
-                in Shape . Polygon convexity points
-                   $ map (concatMap (`elemIndices` points)) paths
+  | otherwise =
+    let points = nub $ concat paths
+     in Shape . Polygon convexity points $
+          map (concatMap (`elemIndices` points)) paths
 
 -- | This provides direct access to the OpenScad @polygon@ command for
 -- performance reasons. This version uses the OpenSCAD arguments:
@@ -313,6 +375,7 @@ offset :: Double -> Join -> Model2d -> Model2d
 offset d j (Shape s) = Shape $ Offset d j s
 
 -- Tools for creating Model3ds
+
 -- | Create a sphere with @sphere /radius 'Facet'/@.
 sphere :: Double -> Facet -> Model3d
 sphere r f = Solid $ Sphere r f
@@ -332,7 +395,7 @@ cylinder h r f = Solid $ Cylinder h r f
 
 -- | Create an oblique cylinder with @cylinder /radius1 height radius2 'Facet'/@.
 obCylinder :: Double -> Double -> Double -> Facet -> Model Vector3d
-obCylinder r1 h r2 f= Solid $ ObCylinder r1 h r2 f
+obCylinder r1 h r2 f = Solid $ ObCylinder r1 h r2 f
 
 -- | Turn a list of list of 'Vector3d's and an int into @polyhedron
 -- /convexity points 'Sides'/@. The argument to polyhedron is the list
@@ -349,7 +412,7 @@ obCylinder r1 h r2 f= Solid $ ObCylinder r1 h r2 f
 -- Passing in 'Sides' that have fewer than three points, have
 -- collinear points or have points that aren't in the same plane is an
 -- error that is caught by the library.
-polyhedron ::  Int -> [[Vector3d]] -> Model3d
+polyhedron :: Int -> [[Vector3d]] -> Model3d
 polyhedron convexity paths
   | any ((< 3) . length) paths = error "Some face has fewer than 3 points."
   | any collinear paths = error "Some face has collinear points."
@@ -360,23 +423,27 @@ polyhedron convexity paths
   | xCross headMax xMax tailMax > 0 =
     error "Face orientations are counterclockwise."
   | otherwise = Solid . Polyhedron convexity points $ sides sidesIn
-  where vectors = concatMap (\p -> zip p (tail p ++ [head p])) paths
-        edges = nub $ map (Set.fromList . \(a, b) -> [a, b]) vectors
-        points = nub $ concat paths
-        xMax = maximum points
-        faceMax = head $ filter (elem xMax) paths
-        (maxFirst, maxLast) = break (== xMax) faceMax
-        (headMax, tailMax)  = (if null maxFirst
-                                  then last maxLast
-                                  else last maxFirst,
-                               if null (tail maxLast)
-                                  then head maxFirst
-                                  else head (tail maxLast))
-        xCross a b c  = (\(a, b, c) -> a) $ (a #- b) #* (b #- c)
-        sidesIn = map (concatMap (`elemIndices` points)) paths
-        sides ss | any ((> 3) . length) ss  = Faces ss
-                 | all ((== 3) . length) ss = Triangles ss
-                 | otherwise = error "Some faces have fewer than 3 points."
+  where
+    vectors = concatMap (\p -> zip p (tail p ++ [head p])) paths
+    edges = nub $ map (Set.fromList . \(a, b) -> [a, b]) vectors
+    points = nub $ concat paths
+    xMax = maximum points
+    faceMax = head $ filter (elem xMax) paths
+    (maxFirst, maxLast) = break (== xMax) faceMax
+    (headMax, tailMax) =
+      ( if null maxFirst
+          then last maxLast
+          else last maxFirst,
+        if null (tail maxLast)
+          then head maxFirst
+          else head (tail maxLast)
+      )
+    xCross a b c = (\(a, b, c) -> a) $ (a #- b) #* (b #- c)
+    sidesIn = map (concatMap (`elemIndices` points)) paths
+    sides ss
+      | any ((> 3) . length) ss = Faces ss
+      | all ((== 3) . length) ss = Triangles ss
+      | otherwise = error "Some faces have fewer than 3 points."
 
 -- | This provides direct access to the OpenSCAD @polyhedron@ command
 -- for performance reasons.  This version uses the OpenSCAD arguments:
@@ -385,7 +452,6 @@ polyhedron convexity paths
 -- 'polyhedron', which needs the other representation.
 unsafePolyhedron :: Int -> [Vector3d] -> Sides -> Model3d
 unsafePolyhedron convexity points sides = Solid $ Polyhedron convexity points sides
-
 
 -- | Transform a 'Model3d' with a 'TransMatrix'
 multMatrix :: TransMatrix -> Model3d -> Model3d
@@ -396,19 +462,26 @@ solid :: Model2d -> Model3d
 solid = Solid . ToSolid
 
 -- | Extrude a 'Model2d' along a line with @linear_extrude@.
-linearExtrude :: Double   -- ^ height
-              -> Double   -- ^ twist
-              -> Vector2d -- ^ scale
-              -> Int      -- ^ slices
-              -> Int      -- ^ convexity
-              -> Facet
-              -> Model2d  -- ^ to extrude
-              -> Model3d
+linearExtrude ::
+  -- | height
+  Double ->
+  -- | twist
+  Double ->
+  -- | scale
+  Vector2d ->
+  -- | slices
+  Int ->
+  -- | convexity
+  Int ->
+  Facet ->
+  -- | to extrude
+  Model2d ->
+  Model3d
 linearExtrude h t sc sl c f m = Solid $ LinearExtrude h t sc sl c f m
 
 -- | Rotate a 'Model2d' around the origin with @rotate_extrude
 -- /convexity 'Facet' 'Model'/@
-rotateExtrude ::  Int -> Facet -> Model2d -> Model3d
+rotateExtrude :: Int -> Facet -> Model2d -> Model3d
 rotateExtrude c f m = Solid $ RotateExtrude c f m
 
 -- | Load a height map from a file with @surface /FilePath Invert Convexity/@.
@@ -416,12 +489,13 @@ surface :: FilePath -> Bool -> Int -> Model3d
 surface f i c = Solid $ Surface f i c
 
 -- And the one polymorphic function we have.
+
 -- | 'importFile' is @import /filename/@.
 importFile :: Vector v => FilePath -> Model v
 importFile = Import
 
-
 -- Transformations
+
 -- | Scale a 'Model', the vector specifying the scale factor for each axis.
 scale :: Vector v => v -> Model v -> Model v
 scale = Scale
@@ -459,8 +533,8 @@ transparent = Transparent
 up :: Double -> Model3d -> Model3d
 up f = translate (0, 0, f)
 
-
 -- Combinations
+
 -- | Create the union of a list of 'Model's.
 union :: Vector v => [Model v] -> Model v
 union = Union
@@ -481,7 +555,6 @@ minkowski = Minkowski
 hull :: Vector v => [Model v] -> Model v
 hull = Hull
 
-
 -- | 'render' does all the real work. It will walk the AST for a 'Model',
 -- returning an OpenSCAD program in a 'String'.
 render :: Vector v => Model v -> String
@@ -498,15 +571,17 @@ render (Translate v s) = rVecSolid "translate" v s
 render (Rotate v s) = "rotate(" ++ rVector v ++ ")" ++ render s
 render (Mirror v s) = rVecSolid "mirror" v s
 render (Import f) = "import(\"" ++ f ++ "\");\n"
-render (Color c s) = let r = toSRGB c in
-    "color(" ++ rVector (channelRed r, channelGreen r, channelBlue r) ++ ")\n"
-    ++ render s
+render (Color c s) =
+  let r = toSRGB c
+   in "color(" ++ rVector (channelRed r, channelGreen r, channelBlue r) ++ ")\n"
+        ++ render s
 render (Transparent c s) =
-    "color(" ++ rQuad (channelRed r, channelGreen r, channelBlue r, a) ++ ")"
+  "color(" ++ rQuad (channelRed r, channelGreen r, channelBlue r, a) ++ ")"
     ++ render s
-    where r = toSRGB $ toPure c
-          a = alphaChannel c
-          toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
+  where
+    r = toSRGB $ toPure c
+    a = alphaChannel c
+    toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
 render (Var (Fa f) ss) = rList ("assign($fa=" ++ show f ++ ")") ss
 render (Var (Fs f) ss) = rList ("assign($fs=" ++ show f ++ ")") ss
 render (Var (Fn n) ss) = rList ("assign($fn=" ++ show n ++ ")") ss
@@ -517,8 +592,13 @@ rShape (Rectangle r f) = "square([" ++ show r ++ "," ++ show f ++ "]);\n"
 rShape (Circle r f) = "circle(" ++ show r ++ rFacet f ++ ");\n"
 rShape (Projection c s) =
   "projection(cut=" ++ (if c then "true)" else "false)") ++ render s
-rShape (Polygon c points paths) = "polygon(points=" ++ rVectorL points ++
- ",paths=" ++ show paths ++ ",convexity=" ++ show c ++ ");\n"
+rShape (Polygon c points paths) =
+  "polygon(points=" ++ rVectorL points
+    ++ ",paths="
+    ++ show paths
+    ++ ",convexity="
+    ++ show c
+    ++ ");\n"
 rShape (Offset d j s) =
   "offset(delta=" ++ show d ++ "," ++ rJoin j ++ ")" ++ rShape s
 
@@ -536,22 +616,35 @@ rSolid (Box x y z) =
 rSolid (Cylinder r h f) =
   "cylinder(r=" ++ show r ++ ",h=" ++ show h ++ rFacet f ++ ");\n"
 rSolid (ObCylinder r1 h r2 f) =
-    "cylinder(r1=" ++ show r1 ++ ",h=" ++ show h ++ ",r2=" ++ show r2 ++ rFacet f
+  "cylinder(r1=" ++ show r1 ++ ",h=" ++ show h ++ ",r2=" ++ show r2 ++ rFacet f
     ++ ");\n"
-rSolid (Polyhedron c ps ss) = "polyhedron(points=" ++  rVectorL ps ++ rSides ss
-                              ++ ",convexity=" ++ show c ++ ");\n"
+rSolid (Polyhedron c ps ss) =
+  "polyhedron(points=" ++ rVectorL ps ++ rSides ss
+    ++ ",convexity="
+    ++ show c
+    ++ ");\n"
 rSolid (MultMatrix (a, b, c, d) s) =
-    "multmatrix([" ++ rQuad a ++ "," ++ rQuad b ++ "," ++ rQuad c ++ ","
-    ++ rQuad d ++"])\n" ++ render s
+  "multmatrix([" ++ rQuad a ++ "," ++ rQuad b ++ "," ++ rQuad c ++ ","
+    ++ rQuad d
+    ++ "])\n"
+    ++ render s
 rSolid (LinearExtrude h t sc sl c f sh) =
-    "linear_extrude(height=" ++ show h ++ ",twist=" ++ show t ++ ",scale="
-    ++ rVector sc ++ ",slices=" ++ show sl ++ ",convexity=" ++ show c
-    ++ rFacet f ++ ")" ++ render sh
+  "linear_extrude(height=" ++ show h ++ ",twist=" ++ show t ++ ",scale="
+    ++ rVector sc
+    ++ ",slices="
+    ++ show sl
+    ++ ",convexity="
+    ++ show c
+    ++ rFacet f
+    ++ ")"
+    ++ render sh
 rSolid (RotateExtrude c f sh) =
   "rotate_extrude(convexity=" ++ show c ++ rFacet f ++ ")" ++ render sh
 rSolid (Surface f i c) =
   "surface(file=\"" ++ f ++ "\"," ++ (if i then "invert=true," else "")
-  ++ "convexity=" ++ show c ++ ");\n"
+    ++ "convexity="
+    ++ show c
+    ++ ");\n"
 rSolid (ToSolid s) = render s
 
 -- render a list of vectors as an Openscad vector of vectors.
@@ -560,6 +653,7 @@ rVectorL vs = "[" ++ intercalate "," (map rVector vs) ++ "]"
 -- render a Sides.
 rSides (Faces vs) = ",faces=" ++ rListL vs
 rSides (Triangles vs) = ",triangles=" ++ rListL vs
+
 rListL vs = "[" ++ intercalate "," (map show vs) ++ "]"
 
 -- | A convenience function to render a list of 'Model's by taking
@@ -578,10 +672,13 @@ drawL :: Vector v => [Model v] -> IO ()
 drawL = draw . Union
 
 -- And some misc. rendering utilities.
-rList n ss = n ++ "{\n" ++  concatMap render ss ++ "}"
+rList n ss = n ++ "{\n" ++ concatMap render ss ++ "}"
+
 rVecSolid n v s = n ++ "(" ++ rVector v ++ ")\n" ++ render s
+
 rQuad (w, x, y, z) =
   "[" ++ show w ++ "," ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]"
+
 rFacet Def = ""
 rFacet f = "," ++ showFacet f
 
@@ -590,9 +687,10 @@ showFacet :: Facet -> String
 showFacet (Fa f) = "$fa=" ++ show f
 showFacet (Fs f) = "$fs=" ++ show f
 showFacet (Fn n) = "$fn=" ++ show n
-showFacet Def    = ""
+showFacet Def = ""
 
 -- Convenience functions for Facets.
+
 -- | 'var' uses @assign@ to set a 'Facet' variable for it's 'Model's.
 var :: Facet -> [Model v] -> Model v
 var = Var
@@ -615,14 +713,15 @@ def :: Facet
 def = Def
 
 -- And one last convenience function.
+
 -- | Use 'diam' to turn a diameter into a radius for circles, spheres, etc.
 diam :: Double -> Double
 diam = (/ 2)
 
 instance Vector v => Semigroup (Model v) where
-  Solid (Box 0 0 0) <> b                 = b
-  a                 <> Solid (Box 0 0 0) = a
-  a                 <> b                 = union [a, b]
+  Solid (Box 0 0 0) <> b = b
+  a <> Solid (Box 0 0 0) = a
+  a <> b = union [a, b]
 
 -- Now, let Haskell work it's magic
 instance Vector v => Monoid (Model v) where
@@ -630,8 +729,8 @@ instance Vector v => Monoid (Model v) where
   mconcat [a] = a
   mconcat as = union as
 
-
 -- | You can use '(#)' to write transformations in a more readable postfix form,
 --   cube 3 # color red # translate (-3, -3, -3)
 infixl 8 #
+
 (#) = flip ($)
