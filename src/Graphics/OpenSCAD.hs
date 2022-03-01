@@ -416,7 +416,7 @@ polyhedron :: Int -> [[Vector3d]] -> Model3d
 polyhedron convexity paths
   | any ((< 3) . length) paths = error "Some face has fewer than 3 points."
   | any collinear paths = error "Some face has collinear points."
-  | any (not . coplanar) paths = error "Some face isn't coplanar."
+  | (not . all coplanar) paths = error "Some face isn't coplanar."
   | length vectors /= length (nub vectors) =
     error "Some faces have different orientation."
   | 2 * length edges /= length vectors = error "Some edges are not in two faces."

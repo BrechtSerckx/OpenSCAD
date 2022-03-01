@@ -22,11 +22,11 @@ assertError err code = do
             ++ show e
             ++ "\ninstead of exception: "
             ++ show err
-    Right _ -> assertFailure $ "Received no exception, but was expecting exception: " ++ (show err)
+    Right _ -> assertFailure $ "Received no exception, but was expecting exception: " ++ show err
 
 sw = concat . words
 
-st n e a = testCase n $ (sw $ render a) @?= (sw e)
+st n e a = testCase n $ sw (render a) @?= sw e
 
 {- About the test result values.
 
