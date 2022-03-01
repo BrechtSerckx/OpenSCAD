@@ -6,16 +6,19 @@ import Control.DeepSeq
 import Control.Exception
 import Test.Tasty
 import Test.Tasty.HUnit
-import Test.HUnit.Tools
 import Graphics.OpenSCAD
 import Data.Colour (withOpacity)
 import Data.List.NonEmpty (fromList)
 import Data.Monoid ((<>), Monoid,mconcat, mempty, mappend)
 
-
-
-assertError err code =
-  assertRaises "Check error"  (ErrorCall err) . evaluate $ deepseq (show code) ()
+assertError err code = do
+  eRes <- try . evaluate $ deepseq (show code) () 
+  case eRes of
+    Left (ErrorCall e) | e == err ->  pure ()
+    Left e | otherwise -> 
+      assertFailure $ "Received unexpected exception: "
+                ++ show e ++ "\ninstead of exception: " ++ show err
+    Right _ -> assertFailure $ "Received no exception, but was expecting exception: " ++ (show err)
 
 sw = concat . words
 st n e a = testCase n $ (sw $ render a) @?= (sw e)

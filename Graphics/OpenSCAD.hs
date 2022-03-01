@@ -1,3 +1,4 @@
+ {-# LANGUAGE FlexibleContexts #-}
  {-# LANGUAGE FlexibleInstances #-}
 
 {- |
@@ -618,12 +619,14 @@ def = Def
 diam :: Double -> Double
 diam = (/ 2)
 
+instance Vector v => Semigroup (Model v) where
+  Solid (Box 0 0 0) <> b                 = b
+  a                 <> Solid (Box 0 0 0) = a
+  a                 <> b                 = union [a, b]
+
 -- Now, let Haskell work it's magic
 instance Vector v => Monoid (Model v) where
   mempty = Solid $ Box 0 0 0
-  mappend (Solid (Box 0 0 0)) b = b
-  mappend a (Solid (Box 0 0 0)) = a
-  mappend a b = union [a, b]
   mconcat [a] = a
   mconcat as = union as
 
