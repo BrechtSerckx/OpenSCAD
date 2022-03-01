@@ -114,7 +114,7 @@ module Graphics.OpenSCAD
     Vector2d,
     Vector3d,
     --  ** Other type aliases
-    Facet,
+    Facets (..),
     TransMatrix,
 
     -- ** Type for 'unsafePolyhedron' 'Sides' argument
@@ -190,6 +190,7 @@ import Data.Colour (AlphaColour, Colour, alphaChannel, darken, over)
 import Data.Colour.Names as Colours
 import Data.Colour.SRGB (channelBlue, channelGreen, channelRed, toSRGB)
 import Data.List (elemIndices, intercalate, nub)
+import Data.Maybe (catMaybes)
 import qualified Data.Set as Set
 
 -- A vector in 2 or 3-space. They are used in transformations of
@@ -265,7 +266,12 @@ type TransMatrix =
 -- control the mesh used during generation of circular objects. They
 -- appear as arguments to various constructors, as well as in the
 -- 'var' function to set them for the argument objects.
-data Facet = Fa Double | Fs Double | Fn Int | Def deriving (Show)
+data Facets = Facets
+  { facetFa :: Maybe Double,
+    facetFs :: Maybe Double,
+    facetFn :: Maybe Int
+  }
+  deriving (Show)
 
 -- | A 'Join' controls how edges in a 'polygon' are joined by the
 -- 'offset' operation.
@@ -274,7 +280,7 @@ data Join = Bevel | Round | Miter Double deriving (Show)
 -- A 'Shape' is a 2-dimensional primitive to be used in a 'Model2d'.
 data Shape
   = Rectangle Double Double
-  | Circle Double Facet
+  | Circle Double Facets
   | Polygon Int [Vector2d] [[Int]]
   | Projection Bool Model3d
   deriving (Show)
@@ -284,14 +290,14 @@ data Sides = Faces [[Int]] | Triangles [[Int]] deriving (Show)
 
 -- A 'Solid' is a 3-dimensional primitive to be used in a 'Model3d'.
 data Solid
-  = Sphere Double Facet
+  = Sphere Double Facets
   | Box Double Double Double
-  | Cylinder Double Double Facet
-  | ObCylinder Double Double Double Facet
+  | Cylinder Double Double Facets
+  | ObCylinder Double Double Double Facets
   | Polyhedron Int [Vector3d] Sides
   | MultMatrix TransMatrix Model3d
-  | LinearExtrude Double Double Vector2d Int Int Facet Model2d
-  | RotateExtrude Int Facet Model2d
+  | LinearExtrude Double Double Vector2d Int Int Facets Model2d
+  | RotateExtrude Int Facets Model2d
   | Surface FilePath Bool Int
   | ToSolid Model2d
   deriving (Show)
@@ -319,7 +325,7 @@ data Model v where
   Difference :: Model v -> Model v -> Model v
   -- And oddball stuff control
   Import :: FilePath -> Model v
-  Var :: Facet -> [Model v] -> Model v
+  Var :: Facets -> [Model v] -> Model v
 
 deriving instance Show Model2d
 
@@ -345,8 +351,8 @@ square :: Double -> Model2d
 square s = rectangle s s
 
 -- | Create a circular 'Model' with @circle /radius/ 'Facet'@.
-circle :: Double -> Facet -> Model2d
-circle r f = Shape $ Circle r f
+circle :: Double -> Facets -> Model2d
+circle r facets = Shape $ Circle r facets
 
 -- | Project a 'Model3d' into a 'Model' with @projection /cut 'Model3d'/@.
 projection :: Bool -> Model3d -> Model2d
@@ -382,7 +388,7 @@ offset = Offset
 -- Tools for creating Model3ds
 
 -- | Create a sphere with @sphere /radius 'Facet'/@.
-sphere :: Double -> Facet -> Model3d
+sphere :: Double -> Facets -> Model3d
 sphere r f = Solid $ Sphere r f
 
 -- | Create a box with @cube /x-size y-size z-size/@
@@ -395,11 +401,11 @@ cube :: Double -> Model3d
 cube x = box x x x
 
 -- | Create a cylinder with @cylinder /radius height 'Facet'/@.
-cylinder :: Double -> Double -> Facet -> Model3d
+cylinder :: Double -> Double -> Facets -> Model3d
 cylinder h r f = Solid $ Cylinder h r f
 
 -- | Create an oblique cylinder with @cylinder /radius1 height radius2 'Facet'/@.
-obCylinder :: Double -> Double -> Double -> Facet -> Model Vector3d
+obCylinder :: Double -> Double -> Double -> Facets -> Model Vector3d
 obCylinder r1 h r2 f = Solid $ ObCylinder r1 h r2 f
 
 -- | Turn a list of list of 'Vector3d's and an int into @polyhedron
@@ -478,7 +484,7 @@ linearExtrude ::
   Int ->
   -- | convexity
   Int ->
-  Facet ->
+  Facets ->
   -- | to extrude
   Model2d ->
   Model3d
@@ -486,7 +492,7 @@ linearExtrude h t sc sl c f m = Solid $ LinearExtrude h t sc sl c f m
 
 -- | Rotate a 'Model2d' around the origin with @rotate_extrude
 -- /convexity 'Facet' 'Model'/@
-rotateExtrude :: Int -> Facet -> Model2d -> Model3d
+rotateExtrude :: Int -> Facets -> Model2d -> Model3d
 rotateExtrude c f m = Solid $ RotateExtrude c f m
 
 -- | Load a height map from a file with @surface /FilePath Invert Convexity/@.
@@ -592,16 +598,14 @@ render (Transparent c s) =
     r = toSRGB $ toPure c
     a = alphaChannel c
     toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
-render (Var (Fa f) ss) = rList ("assign($fa=" ++ show f ++ ")") ss
-render (Var (Fs f) ss) = rList ("assign($fs=" ++ show f ++ ")") ss
-render (Var (Fn n) ss) = rList ("assign($fn=" ++ show n ++ ")") ss
 render (Offset d j m) =
   "offset(delta=" ++ show d ++ "," ++ rJoin j ++ ")" ++ render m
+render (Var facets ss) = rList ("let(" ++ rFacets facets ++ ")") ss
 
 -- utility for rendering Shapes.
 rShape :: Shape -> String
 rShape (Rectangle r f) = "square([" ++ show r ++ "," ++ show f ++ "]);\n"
-rShape (Circle r f) = "circle(" ++ show r ++ rFacet f ++ ");\n"
+rShape (Circle r facets) = "circle(" ++ show r ++ rFacets' facets ++ ");\n"
 rShape (Projection c s) =
   "projection(cut=" ++ (if c then "true)" else "false)") ++ render s
 rShape (Polygon c points paths) =
@@ -620,13 +624,13 @@ rJoin (Miter l) = "miter_limit=" ++ show l
 
 -- utilities for rendering Solids.
 rSolid :: Solid -> String
-rSolid (Sphere x f) = "sphere(" ++ show x ++ rFacet f ++ ");\n"
+rSolid (Sphere x f) = "sphere(" ++ show x ++ rFacets' f ++ ");\n"
 rSolid (Box x y z) =
   "cube([" ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]);\n"
 rSolid (Cylinder r h f) =
-  "cylinder(r=" ++ show r ++ ",h=" ++ show h ++ rFacet f ++ ");\n"
+  "cylinder(r=" ++ show r ++ ",h=" ++ show h ++ rFacets' f ++ ");\n"
 rSolid (ObCylinder r1 h r2 f) =
-  "cylinder(r1=" ++ show r1 ++ ",h=" ++ show h ++ ",r2=" ++ show r2 ++ rFacet f
+  "cylinder(r1=" ++ show r1 ++ ",h=" ++ show h ++ ",r2=" ++ show r2 ++ rFacets' f
     ++ ");\n"
 rSolid (Polyhedron c ps ss) =
   "polyhedron(points=" ++ rVectorL ps ++ rSides ss
@@ -645,11 +649,11 @@ rSolid (LinearExtrude h t sc sl c f sh) =
     ++ show sl
     ++ ",convexity="
     ++ show c
-    ++ rFacet f
+    ++ rFacets' f
     ++ ")"
     ++ render sh
 rSolid (RotateExtrude c f sh) =
-  "rotate_extrude(convexity=" ++ show c ++ rFacet f ++ ")" ++ render sh
+  "rotate_extrude(convexity=" ++ show c ++ rFacets' f ++ ")" ++ render sh
 rSolid (Surface f i c) =
   "surface(file=\"" ++ f ++ "\"," ++ (if i then "invert=true," else "")
     ++ "convexity="
@@ -695,39 +699,38 @@ rQuad :: (Show a, Show b, Show c, Show d) => (a, b, c, d) -> [Char]
 rQuad (w, x, y, z) =
   "[" ++ show w ++ "," ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]"
 
-rFacet :: Facet -> [Char]
-rFacet Def = ""
-rFacet f = "," ++ showFacet f
+rFacets :: Facets -> [Char]
+rFacets (Facets fa' fs' fn') =
+  intercalate "," $ catMaybes [rFacet "fa" <$> fa', rFacet "fs" <$> fs', rFacet "fn" <$> fn']
 
--- render a facet setting.
-showFacet :: Facet -> String
-showFacet (Fa f) = "$fa=" ++ show f
-showFacet (Fs f) = "$fs=" ++ show f
-showFacet (Fn n) = "$fn=" ++ show n
-showFacet Def = ""
+rFacets' :: Facets -> [Char]
+rFacets' facets = case rFacets facets of
+  "" -> ""
+  s -> "," ++ s
+
+rFacet :: Show a => String -> a -> String
+rFacet name a = "$" ++ name ++ "=" ++ show a
 
 -- Convenience functions for Facets.
 
 -- | 'var' uses @assign@ to set a 'Facet' variable for it's 'Model's.
-var :: Facet -> [Model v] -> Model v
+var :: Facets -> [Model v] -> Model v
 var = Var
 
 -- | 'fa' is used to set the @$fa@ variable in a 'Facet' or 'var'.
-fa :: Double -> Facet
-fa = Fa
+fa :: Double -> Facets
+fa a = Facets (Just a) Nothing Nothing
 
 -- | 'fs' is used to set the @$fs@ variable in a 'Facet' or 'var'.
-fs :: Double -> Facet
-fs = Fs
+fs :: Double -> Facets
+fs a = Facets Nothing (Just a) Nothing
 
 -- | 'fn' is used to set the @$fn@ variable in a 'Facet' or 'var'.
-fn :: Int -> Facet
-fn = Fn
+fn :: Int -> Facets
+fn a = Facets Nothing Nothing (Just a)
 
--- | 'def' is used where a 'Facet' is needed but we don't want to change
--- any of the values.
-def :: Facet
-def = Def
+def :: Facets
+def = Facets Nothing Nothing Nothing
 
 -- And one last convenience function.
 

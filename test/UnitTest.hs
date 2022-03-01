@@ -325,15 +325,15 @@ tests =
         "Facets"
         [ st
             "facet 1"
-            "assign($fn=100){sphere(2.0,$fn=100);}"
+            "let($fn=100){sphere(2.0,$fn=100);}"
             (var (fn 100) [sphere 2 $ fn 100]),
           st
             "facet 2"
-            "assign($fa=5.0){sphere(2.0,$fa=5.0);}"
+            "let($fa=5.0){sphere(2.0,$fa=5.0);}"
             (var (fa 5) [sphere 2 $ fa 5]),
           st
             "facet 3"
-            "assign($fs=0.1){sphere(2.0,$fs=0.1);}"
+            "let($fs=0.1){sphere(2.0,$fs=0.1);}"
             (var (fs 0.1) [sphere 2 $ fs 0.1])
         ],
       testGroup
