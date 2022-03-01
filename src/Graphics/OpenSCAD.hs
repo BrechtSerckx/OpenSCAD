@@ -277,7 +277,6 @@ data Shape
   | Circle Double Facet
   | Polygon Int [Vector2d] [[Int]]
   | Projection Bool Model3d
-  | Offset Double Join Shape
   deriving (Show)
 
 -- | The third argument to unsafePolyhedron is a 'Sides'.
@@ -311,6 +310,7 @@ data Model v where
   Mirror :: v -> Model v -> Model v
   Color :: Colour Double -> Model v -> Model v
   Transparent :: AlphaColour Double -> Model v -> Model v
+  Offset :: Double -> Join -> Model2d -> Model2d
   -- and combinations -> Model v
   Union :: [Model v] -> Model v
   Intersection :: [Model v] -> Model v
@@ -377,7 +377,7 @@ unsafePolygon convexity points paths = Shape $ Polygon convexity points paths
 
 -- | 'offset' a 'Model2d's edges by @offset /delta join/@.
 offset :: Double -> Join -> Model2d -> Model2d
-offset d j (Shape s) = Shape $ Offset d j s
+offset = Offset
 
 -- Tools for creating Model3ds
 
@@ -595,6 +595,8 @@ render (Transparent c s) =
 render (Var (Fa f) ss) = rList ("assign($fa=" ++ show f ++ ")") ss
 render (Var (Fs f) ss) = rList ("assign($fs=" ++ show f ++ ")") ss
 render (Var (Fn n) ss) = rList ("assign($fn=" ++ show n ++ ")") ss
+render (Offset d j m) =
+  "offset(delta=" ++ show d ++ "," ++ rJoin j ++ ")" ++ render m
 
 -- utility for rendering Shapes.
 rShape :: Shape -> String
@@ -609,8 +611,6 @@ rShape (Polygon c points paths) =
     ++ ",convexity="
     ++ show c
     ++ ");\n"
-rShape (Offset d j s) =
-  "offset(delta=" ++ show d ++ "," ++ rJoin j ++ ")" ++ rShape s
 
 -- utility for rendering Joins
 rJoin :: Join -> String
