@@ -254,23 +254,23 @@ tests =
             [ st
                 "1"
                 "rotate([180.0,0.0,0.0])cube([2.0,2.0,2.0]);"
-                (rotate (180, 0, 0) $ cube 2),
+                (rotate3d (180, 0, 0) $ cube 2),
               st
                 "2"
                 "rotate([0.0,180.0,0.0])cube([2.0,2.0,2.0]);"
-                (rotate (0, 180, 0) $ cube 2),
+                (rotate3d (0, 180, 0) $ cube 2),
               st
                 "3"
                 "rotate([0.0,180.0,180.0])cube([2.0,2.0,2.0]);"
-                (rotate (0, 180, 180) $ cube 2),
+                (rotate3d (0, 180, 180) $ cube 2),
               st
                 "4"
-                "rotate([180.0,0.0])square([2.0,1.0]);"
-                (rotate (180, 0) $ rectangle 2 1),
+                "rotate([0.0,0.0,180.0])square([2.0,1.0]);"
+                (rotate2d 180 $ rectangle 2 1),
               st
                 "5"
-                "rotate([0.0,180.0])square([2.0,1.0]);"
-                (rotate (0, 180) $ rectangle 2 1)
+                "rotate([0.0,0.0,180.0])square([2.0,1.0]);"
+                (rotate2d 180 $ rectangle 2 1)
             ],
           testGroup
             "Mirrors"
@@ -285,7 +285,7 @@ tests =
               st
                 "3"
                 "rotate([0.0,1.0,1.0])cube([2.0,2.0,2.0]);"
-                (rotate (0, 1, 1) $ cube 2),
+                (rotate3d (0, 1, 1) $ cube 2),
               st
                 "4"
                 "mirror([1.0,0.0])square([2.0,1.0]);"

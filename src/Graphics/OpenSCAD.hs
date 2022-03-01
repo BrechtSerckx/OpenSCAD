@@ -157,7 +157,8 @@ module Graphics.OpenSCAD
     -- ** Transformations
     scale,
     resize,
-    rotate,
+    rotate2d,
+    rotate3d,
     translate,
     mirror,
     color,
@@ -306,7 +307,8 @@ data Model v where
   Solid :: Solid -> Model3d
   Scale :: v -> Model v -> Model v
   Resize :: v -> Model v -> Model v
-  Rotate :: v -> Model v -> Model v
+  Rotate2d :: Double -> Model2d -> Model2d
+  Rotate3d :: Vector3d -> Model3d -> Model3d
   Translate :: v -> Model v -> Model v
   Mirror :: v -> Model v -> Model v
   Color :: Colour Double -> Model v -> Model v
@@ -510,9 +512,13 @@ scale = Scale
 resize :: Vector v => v -> Model v -> Model v
 resize = Resize
 
+-- | Rotate a 'Model' around the z-axis
+rotate2d :: Double -> Model2d -> Model2d
+rotate2d = Rotate2d
+
 -- | Rotate a 'Model' by different amounts around each of the three axis.
-rotate :: Vector v => v -> Model v -> Model v
-rotate = Rotate
+rotate3d :: Vector3d -> Model3d -> Model3d
+rotate3d = Rotate3d
 
 -- | Translate a 'Model' along a 'Vector'.
 translate :: Vector v => v -> Model v -> Model v
@@ -573,7 +579,8 @@ render (Hull ss) = rList "hull()" ss
 render (Scale v s) = rVecSolid "scale" v s
 render (Resize v s) = rVecSolid "resize" v s
 render (Translate v s) = rVecSolid "translate" v s
-render (Rotate v s) = "rotate(" ++ rVector v ++ ")" ++ render s
+render (Rotate2d v s) = "rotate(" ++ rVector ((0, 0, v) :: Vector3d) ++ ")" ++ render s
+render (Rotate3d v s) = "rotate(" ++ rVector v ++ ")" ++ render s
 render (Mirror v s) = rVecSolid "mirror" v s
 render (Import f) = "import(\"" ++ f ++ "\");\n"
 render (Color c s) =
