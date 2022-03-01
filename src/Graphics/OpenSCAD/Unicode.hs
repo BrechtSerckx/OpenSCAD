@@ -12,7 +12,6 @@ Stability   : experimental
 
 module Graphics.OpenSCAD.Unicode where
 
-import Data.Monoid ((<>))
 import Graphics.OpenSCAD
 
 infixl 6 ∪

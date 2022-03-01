@@ -129,6 +129,7 @@ module Graphics.OpenSCAD
     polygon,
     unsafePolygon,
     projection,
+    offset,
     importFile,
 
     -- ** 'Model3d's
@@ -185,14 +186,11 @@ module Graphics.OpenSCAD
   )
 where
 
-import Data.Colour (AlphaColour, Colour, alphaChannel, black, darken, over)
+import Data.Colour (AlphaColour, Colour, alphaChannel, darken, over)
 import Data.Colour.Names as Colours
 import Data.Colour.SRGB (channelBlue, channelGreen, channelRed, toSRGB)
 import Data.List (elemIndices, intercalate, nub)
-import qualified Data.List.NonEmpty as NE
-import Data.Monoid (Monoid, mappend, mconcat, mempty, (<>))
 import qualified Data.Set as Set
-import System.FilePath (FilePath)
 
 -- A vector in 2 or 3-space. They are used in transformations of
 -- 'Model's of their type.
@@ -445,7 +443,7 @@ polyhedron convexity paths
           then head maxFirst
           else head (tail maxLast)
       )
-    xCross a b c = (\(a, b, c) -> a) $ (a #- b) #* (b #- c)
+    xCross a b c = (\(a', _b', _c') -> a') $ (a #- b) #* (b #- c)
     sidesIn = map (concatMap (`elemIndices` points)) paths
     sides ss
       | any ((> 3) . length) ss = Faces ss
@@ -660,12 +658,15 @@ rSolid (Surface f i c) =
 rSolid (ToSolid s) = render s
 
 -- render a list of vectors as an Openscad vector of vectors.
+rVectorL :: Vector v => [v] -> [Char]
 rVectorL vs = "[" ++ intercalate "," (map rVector vs) ++ "]"
 
 -- render a Sides.
+rSides :: Sides -> [Char]
 rSides (Faces vs) = ",faces=" ++ rListL vs
 rSides (Triangles vs) = ",triangles=" ++ rListL vs
 
+rListL :: Show a => [a] -> [Char]
 rListL vs = "[" ++ intercalate "," (map show vs) ++ "]"
 
 -- | A convenience function to render a list of 'Model's by taking
@@ -684,13 +685,17 @@ drawL :: Vector v => [Model v] -> IO ()
 drawL = draw . Union
 
 -- And some misc. rendering utilities.
+rList :: (Foldable t, Vector v) => [Char] -> t (Model v) -> [Char]
 rList n ss = n ++ "{\n" ++ concatMap render ss ++ "}"
 
+rVecSolid :: Vector v => [Char] -> v -> Model v -> [Char]
 rVecSolid n v s = n ++ "(" ++ rVector v ++ ")\n" ++ render s
 
+rQuad :: (Show a, Show b, Show c, Show d) => (a, b, c, d) -> [Char]
 rQuad (w, x, y, z) =
   "[" ++ show w ++ "," ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]"
 
+rFacet :: Facet -> [Char]
 rFacet Def = ""
 rFacet f = "," ++ showFacet f
 
@@ -755,4 +760,5 @@ instance Monoid Model3d where
 --   cube 3 # color red # translate (-3, -3, -3)
 infixl 8 #
 
+(#) :: a -> (a -> c) -> c
 (#) = flip ($)

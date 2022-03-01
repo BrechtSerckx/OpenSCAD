@@ -5,8 +5,6 @@ module Main where
 import Control.DeepSeq
 import Control.Exception
 import Data.Colour (withOpacity)
-import Data.List.NonEmpty (fromList)
-import Data.Monoid (Monoid, mappend, mconcat, mempty, (<>))
 import Graphics.OpenSCAD
 import Test.Tasty
 import Test.Tasty.HUnit
