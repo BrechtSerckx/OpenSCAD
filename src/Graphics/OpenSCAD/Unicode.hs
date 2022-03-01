@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UnicodeSyntax #-}
 
 {-
@@ -27,7 +28,7 @@ infixl 9 ⊕
 -- | (&#x222A;) = 'union'
 --
 -- U+222A, UNION
-(∪) :: Vector v => Model v -> Model v -> Model v
+(∪) :: Semigroup (Model v) => Model v -> Model v -> Model v
 (∪) = (<>)
 
 -- | (&#x2229;) = 'intersection'
@@ -45,7 +46,7 @@ a ∩ b = intersection [a, b]
 -- | (&#x2296;) = Symmetric difference
 --
 -- U+2296, CIRCLED MINUS
-(⊖) :: Vector v => Model v -> Model v -> Model v
+(⊖) :: (Semigroup (Model v), Vector v) => Model v -> Model v -> Model v
 a ⊖ b = (a ∖ b) ∪ (b ∖ a)
 
 -- | (&#2295;) = 'minkowski'

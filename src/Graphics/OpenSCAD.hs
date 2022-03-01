@@ -1,5 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 -- |
 -- Module      : Graphics.OpenSCAD
@@ -299,26 +301,29 @@ data Solid
 -- | A 'Model' is either a 'Model2d', a 'Model3d', a transformation of
 -- a 'Model', a combination of 'Model's, or a 'Model' with it's
 -- rendering tweaked by a 'Facet'. 'Model's can be rendered.
-data Model v
-  = Shape Shape
-  | Solid Solid
-  | Scale v (Model v)
-  | Resize v (Model v)
-  | Rotate v (Model v)
-  | Translate v (Model v)
-  | Mirror v (Model v)
-  | Color (Colour Double) (Model v)
-  | Transparent (AlphaColour Double) (Model v)
-  | -- and combinations
-    Union [Model v]
-  | Intersection [Model v]
-  | Minkowski [Model v]
-  | Hull [Model v]
-  | Difference (Model v) (Model v)
-  | -- And oddball stuff control
-    Import FilePath
-  | Var Facet [Model v]
-  deriving (Show)
+data Model v where
+  Shape :: Shape -> Model2d
+  Solid :: Solid -> Model3d
+  Scale :: v -> Model v -> Model v
+  Resize :: v -> Model v -> Model v
+  Rotate :: v -> Model v -> Model v
+  Translate :: v -> Model v -> Model v
+  Mirror :: v -> Model v -> Model v
+  Color :: Colour Double -> Model v -> Model v
+  Transparent :: AlphaColour Double -> Model v -> Model v
+  -- and combinations -> Model v
+  Union :: [Model v] -> Model v
+  Intersection :: [Model v] -> Model v
+  Minkowski :: [Model v] -> Model v
+  Hull :: [Model v] -> Model v
+  Difference :: Model v -> Model v -> Model v
+  -- And oddball stuff control
+  Import :: FilePath -> Model v
+  Var :: Facet -> [Model v] -> Model v
+
+deriving instance Show Model2d
+
+deriving instance Show Model3d
 
 -- | A two-dimensional model. Note that the types do not mix
 -- implicitly. You must turn a 'Model2d' into a 'Model3d' using one of
@@ -718,13 +723,23 @@ def = Def
 diam :: Double -> Double
 diam = (/ 2)
 
-instance Vector v => Semigroup (Model v) where
+instance Semigroup Model2d where
+  Shape (Rectangle 0 0) <> b = b
+  a <> Shape (Rectangle 0 0) = a
+  a <> b = union [a, b]
+
+instance Semigroup Model3d where
   Solid (Box 0 0 0) <> b = b
   a <> Solid (Box 0 0 0) = a
   a <> b = union [a, b]
 
 -- Now, let Haskell work it's magic
-instance Vector v => Monoid (Model v) where
+instance Monoid Model2d where
+  mempty = Shape $ Rectangle 0 0
+  mconcat [a] = a
+  mconcat as = union as
+
+instance Monoid Model3d where
   mempty = Solid $ Box 0 0 0
   mconcat [a] = a
   mconcat as = union as
