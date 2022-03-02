@@ -573,44 +573,45 @@ hull = Hull
 -- | 'render' does all the real work. It will walk the AST for a 'Model',
 -- returning an OpenSCAD program in a 'String'.
 render :: Vector v => Model v -> String
-render (Shape s) = rShape s
-render (Solid s) = renderSolid s
-render (Union ss) = rList "union()" ss
-render (Intersection ss) = rList "intersection()" ss
-render (Difference s1 s2) = "difference(){" ++ render s1 ++ render s2 ++ "}\n"
-render (Minkowski ss) = rList "minkowski()" ss
-render (Hull ss) = rList "hull()" ss
-render (Scale v s) = rVecSolid "scale" v s
-render (Resize v s) = rVecSolid "resize" v s
-render (Translate v s) = rVecSolid "translate" v s
-render (Rotate2d v s) = "rotate(" ++ rVector ((0, 0, v) :: Vector3d) ++ ")" ++ render s
-render (Rotate3d v s) = "rotate(" ++ rVector v ++ ")" ++ render s
-render (Mirror v s) = rVecSolid "mirror" v s
-render (Import f) = "import(\"" ++ f ++ "\");\n"
-render (Color c s) =
-  let r = toSRGB c
-   in "color(" ++ rVector (channelRed r, channelGreen r, channelBlue r) ++ ")\n"
-        ++ render s
-render (Transparent c s) =
-  "color(" ++ rQuad (channelRed r, channelGreen r, channelBlue r, a) ++ ")"
-    ++ render s
-  where
-    r = toSRGB $ toPure c
-    a = alphaChannel c
-    toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
-render (Offset d j m) =
-  "offset(delta=" ++ show d ++ "," ++ rJoin j ++ ")" ++ render m
-render (Var facets ss) = rList ("let(" ++ rFacets facets ++ ")") ss
+render = \case
+  Shape s -> renderShape s
+  Solid s -> renderSolid s
+  Union ss -> renderOperator "union" [] ss
+  Intersection ss -> renderOperator "intersection" [] ss
+  Difference s1 s2 -> renderOperator "difference" [] [s1, s2]
+  Minkowski ss -> renderOperator "minkowski" [] ss
+  Hull ss -> renderOperator "hull" [] ss
+  Scale v s -> rVecSolid "scale" v s
+  Resize v s -> rVecSolid "resize" v s
+  Translate v s -> rVecSolid "translate" v s
+  Rotate2d v s -> "rotate(" ++ rVector ((0, 0, v) :: Vector3d) ++ ")" ++ render s
+  Rotate3d v s -> "rotate(" ++ rVector v ++ ")" ++ render s
+  Mirror v s -> rVecSolid "mirror" v s
+  Import f -> "import(\"" ++ f ++ "\");\n"
+  Color c s ->
+    let r = toSRGB c
+     in "color(" ++ rVector (channelRed r, channelGreen r, channelBlue r) ++ ")\n"
+          ++ render s
+  Transparent c s ->
+    "color(" ++ rQuad (channelRed r, channelGreen r, channelBlue r, a) ++ ")"
+      ++ render s
+    where
+      r = toSRGB $ toPure c
+      a = alphaChannel c
+      toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
+  Offset d j m ->
+    "offset(delta=" ++ show d ++ "," ++ rJoin j ++ ")" ++ render m
+  Var facets ss -> rList ("let(" ++ rFacets facets ++ ")") ss
 
 -- utility for rendering Shapes.
-rShape :: Shape -> String
-rShape = \case
+renderShape :: Shape -> String
+renderShape = \case
   Rectangle r f ->
     renderAction "square" [renderList [show r, show f]]
   Circle r facets ->
     renderAction "circle" $ show r : renderFacetsArgs facets
   Projection c s ->
-    renderOperator "projection" [namedArg "cut" $ renderBool c] s
+    renderOperator "projection" [namedArg "cut" $ renderBool c] [s]
   Polygon c points paths ->
     renderAction
       "polygon"
@@ -622,8 +623,12 @@ rShape = \case
 renderAction :: String -> [String] -> String
 renderAction name args = name ++ renderArgs args ++ ";\n"
 
-renderOperator :: Vector v => String -> [String] -> Model v -> String
-renderOperator name args m = name ++ renderArgs args ++ " " ++ render m
+renderOperator :: Vector v => String -> [String] -> [Model v] -> String
+renderOperator name args ms =
+  let renderMs = case ms of
+        [m] -> render m
+        _ -> "{" ++ concatMap render ms ++ "}"
+   in name ++ renderArgs args ++ " " ++ renderMs
 
 renderBool :: Bool -> String
 renderBool b = if b then "true" else "false"
@@ -666,7 +671,7 @@ renderSolid = \case
           show c
       ]
   MultMatrix (a, b, c, d) s ->
-    renderOperator "multmatrix" [renderList [rQuad a, rQuad b, rQuad c, rQuad d]] s
+    renderOperator "multmatrix" [renderList [rQuad a, rQuad b, rQuad c, rQuad d]] [s]
   LinearExtrude h t sc sl c f sh ->
     renderOperator
       "linear_extrude"
@@ -678,9 +683,9 @@ renderSolid = \case
         ]
           ++ renderFacetsArgs f
       )
-      sh
+      [sh]
   RotateExtrude c f sh ->
-    renderOperator "rotate_extrude" (namedArg "convexity" (show c) : renderFacetsArgs f) sh
+    renderOperator "rotate_extrude" (namedArg "convexity" (show c) : renderFacetsArgs f) [sh]
   Surface f i c ->
     renderAction
       "surface"
