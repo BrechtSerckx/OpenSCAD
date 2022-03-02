@@ -32,6 +32,7 @@ library
   default-language:    Haskell2010
   default-extensions:
     LambdaCase
+    TupleSections
 
 Test-Suite OpenSCAD-Units
   type:        exitcode-stdio-1.0

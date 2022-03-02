@@ -606,7 +606,7 @@ render (Var facets ss) = rList ("let(" ++ rFacets facets ++ ")") ss
 rShape :: Shape -> String
 rShape = \case
   Rectangle r f -> renderAction "square" [(Nothing, renderList [show r, show f])]
-  Circle r facets -> renderAction "circle" [(Nothing, show r), (Nothing, rFacets' facets)] -- FIXME: rFacets'
+  Circle r facets -> renderAction "circle" ((Nothing, show r) : facetsToArgs facets) -- FIXME: rFacets'
   Projection c s ->
     renderOperator
       "projection"
@@ -720,6 +720,10 @@ rQuad (w, x, y, z) =
 rFacets :: Facets -> [Char]
 rFacets (Facets fa' fs' fn') =
   intercalate "," $ catMaybes [rFacet "fa" <$> fa', rFacet "fs" <$> fs', rFacet "fn" <$> fn']
+
+facetsToArgs :: Facets -> [(Maybe String, String)]
+facetsToArgs (Facets fa' fs' fn') =
+  catMaybes [(Just "$fa",) . show <$> fa', (Just "$fs",) . show <$> fs', (Just "$fn",) . show <$> fn']
 
 rFacets' :: Facets -> [Char]
 rFacets' facets = case rFacets facets of
