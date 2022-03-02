@@ -604,17 +604,35 @@ render (Var facets ss) = rList ("let(" ++ rFacets facets ++ ")") ss
 
 -- utility for rendering Shapes.
 rShape :: Shape -> String
-rShape (Rectangle r f) = "square([" ++ show r ++ "," ++ show f ++ "]);\n"
-rShape (Circle r facets) = "circle(" ++ show r ++ rFacets' facets ++ ");\n"
-rShape (Projection c s) =
-  "projection(cut=" ++ (if c then "true)" else "false)") ++ render s
-rShape (Polygon c points paths) =
-  "polygon(points=" ++ rVectorL points
-    ++ ",paths="
-    ++ show paths
-    ++ ",convexity="
-    ++ show c
-    ++ ");\n"
+rShape = \case
+  Rectangle r f -> renderAction "square" [(Nothing, renderList [show r, show f])]
+  Circle r facets -> renderAction "circle" [(Nothing, show r), (Nothing, rFacets' facets)] -- FIXME: rFacets'
+  Projection c s ->
+    renderOperator
+      "projection"
+      [(Just "cut", renderBool c)]
+      s
+  Polygon c points paths -> renderAction "polygon" [(Just "points", rVectorL points), (Just "paths", show paths), (Just "convexity", show c)]
+
+renderAction :: String -> [(Maybe String, String)] -> String
+renderAction name args = name ++ renderArgs args ++ ";\n"
+
+renderOperator :: Vector v => String -> [(Maybe String, String)] -> Model v -> String
+renderOperator name args m = name ++ renderArgs args ++ " " ++ render m
+
+renderBool :: Bool -> String
+renderBool b = if b then "true" else "false"
+
+renderArgs :: [(Maybe String, String)] -> String
+renderArgs args = "(" ++ intercalate "," (uncurry renderArg <$> args) ++ ")"
+
+renderArg :: Maybe String -> String -> String
+renderArg mName val = case mName of
+  Just name -> name ++ "=" ++ val
+  Nothing -> val
+
+renderList :: [String] -> String
+renderList l = "[" ++ intercalate "," l ++ "]"
 
 -- utility for rendering Joins
 rJoin :: Join -> String
