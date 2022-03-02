@@ -581,12 +581,12 @@ render = \case
   Difference s1 s2 -> renderOperator "difference" [] [s1, s2]
   Minkowski ss -> renderOperator "minkowski" [] ss
   Hull ss -> renderOperator "hull" [] ss
-  Scale v s -> rVecSolid "scale" v s
-  Resize v s -> rVecSolid "resize" v s
-  Translate v s -> rVecSolid "translate" v s
-  Rotate2d v s -> "rotate(" ++ rVector ((0, 0, v) :: Vector3d) ++ ")" ++ render s
-  Rotate3d v s -> "rotate(" ++ rVector v ++ ")" ++ render s
-  Mirror v s -> rVecSolid "mirror" v s
+  Scale v s -> renderOperator "scale" [rVector v] [s]
+  Resize v s -> renderOperator "resize" [rVector v] [s]
+  Translate v s -> renderOperator "translate" [rVector v] [s]
+  Rotate2d v s -> renderOperator "rotate" [rVector ((0, 0, v) :: Vector3d)] [s]
+  Rotate3d v s -> renderOperator "rotate" [rVector v] [s]
+  Mirror v s -> renderOperator "mirror" [rVector v] [s]
   Import f -> "import(\"" ++ f ++ "\");\n"
   Color c s ->
     let r = toSRGB c
@@ -725,9 +725,6 @@ drawL = draw . Union
 -- And some misc. rendering utilities.
 rList :: (Foldable t, Vector v) => [Char] -> t (Model v) -> [Char]
 rList n ss = n ++ "{\n" ++ concatMap render ss ++ "}"
-
-rVecSolid :: Vector v => [Char] -> v -> Model v -> [Char]
-rVecSolid n v s = n ++ "(" ++ rVector v ++ ")\n" ++ render s
 
 rQuad :: (Show a, Show b, Show c, Show d) => (a, b, c, d) -> [Char]
 rQuad (w, x, y, z) =
