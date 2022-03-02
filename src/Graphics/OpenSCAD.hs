@@ -587,21 +587,25 @@ render = \case
   Rotate2d v s -> renderOperator "rotate" [rVector ((0, 0, v) :: Vector3d)] [s]
   Rotate3d v s -> renderOperator "rotate" [rVector v] [s]
   Mirror v s -> renderOperator "mirror" [rVector v] [s]
-  Import f -> "import(\"" ++ f ++ "\");\n"
+  Import f -> renderAction "import" ["\"" ++ f ++ "\""]
   Color c s ->
     let r = toSRGB c
-     in "color(" ++ rVector (channelRed r, channelGreen r, channelBlue r) ++ ")\n"
-          ++ render s
+     in renderOperator
+          "color"
+          [rVector (channelRed r, channelGreen r, channelBlue r)]
+          [s]
   Transparent c s ->
-    "color(" ++ rQuad (channelRed r, channelGreen r, channelBlue r, a) ++ ")"
-      ++ render s
+    renderOperator
+      "color"
+      [rQuad (channelRed r, channelGreen r, channelBlue r, a)]
+      [s]
     where
       r = toSRGB $ toPure c
       a = alphaChannel c
       toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
   Offset d j m ->
-    "offset(delta=" ++ show d ++ "," ++ rJoin j ++ ")" ++ render m
-  Var facets ss -> rList ("let(" ++ rFacets facets ++ ")") ss
+    renderOperator "offset" [namedArg "delta" $ show d, renderJoin j] [m]
+  Var facets ss -> renderOperator "let" (renderFacets facets) ss
 
 -- utility for rendering Shapes.
 renderShape :: Shape -> String
@@ -609,7 +613,7 @@ renderShape = \case
   Rectangle r f ->
     renderAction "square" [renderList [show r, show f]]
   Circle r facets ->
-    renderAction "circle" $ show r : renderFacetsArgs facets
+    renderAction "circle" $ show r : renderFacets facets
   Projection c s ->
     renderOperator "projection" [namedArg "cut" $ renderBool c] [s]
   Polygon c points paths ->
@@ -643,25 +647,25 @@ renderList :: [String] -> String
 renderList l = "[" ++ intercalate "," l ++ "]"
 
 -- utility for rendering Joins
-rJoin :: Join -> String
-rJoin Bevel = "join_type=bevel"
-rJoin Round = "join_type=round"
-rJoin (Miter l) = "miter_limit=" ++ show l
+renderJoin :: Join -> String
+renderJoin Bevel = namedArg "join_type" "bevel"
+renderJoin Round = namedArg "join_type" "round"
+renderJoin (Miter l) = namedArg "miter_limit" $ show l
 
 -- utilities for rendering Solids.
 renderSolid :: Solid -> String
 renderSolid = \case
   Sphere x f ->
-    renderAction "sphere" (show x : renderFacetsArgs f)
+    renderAction "sphere" (show x : renderFacets f)
   Box x y z ->
     renderAction "cube" [renderList [show x, show y, show z]]
   Cylinder r h f ->
     renderAction "cylinder" $
-      [namedArg "r" $ show r, namedArg "h" $ show h] ++ renderFacetsArgs f
+      [namedArg "r" $ show r, namedArg "h" $ show h] ++ renderFacets f
   ObCylinder r1 h r2 f ->
     renderAction "cylinder" $
       [namedArg "r1" $ show r1, namedArg "h" $ show h, namedArg "r2" $ show r2]
-        ++ renderFacetsArgs f
+        ++ renderFacets f
   Polyhedron c ps ss ->
     renderAction
       "polyhedron"
@@ -681,11 +685,11 @@ renderSolid = \case
           namedArg "slices" $ show sl,
           namedArg "convexity" $ show c
         ]
-          ++ renderFacetsArgs f
+          ++ renderFacets f
       )
       [sh]
   RotateExtrude c f sh ->
-    renderOperator "rotate_extrude" (namedArg "convexity" (show c) : renderFacetsArgs f) [sh]
+    renderOperator "rotate_extrude" (namedArg "convexity" (show c) : renderFacets f) [sh]
   Surface f i c ->
     renderAction
       "surface"
@@ -722,26 +726,13 @@ draw = putStrLn . render
 drawL :: Vector v => [Model v] -> IO ()
 drawL = draw . Union
 
--- And some misc. rendering utilities.
-rList :: (Foldable t, Vector v) => [Char] -> t (Model v) -> [Char]
-rList n ss = n ++ "{\n" ++ concatMap render ss ++ "}"
-
 rQuad :: (Show a, Show b, Show c, Show d) => (a, b, c, d) -> [Char]
 rQuad (w, x, y, z) =
   "[" ++ show w ++ "," ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]"
 
-rFacets :: Facets -> [Char]
-rFacets (Facets fa' fs' fn') =
-  intercalate "," $ catMaybes [rFacet "fa" <$> fa', rFacet "fs" <$> fs', rFacet "fn" <$> fn']
-
-renderFacetsArgs :: Facets -> [String]
-renderFacetsArgs (Facets fa' fs' fn') =
+renderFacets :: Facets -> [String]
+renderFacets (Facets fa' fs' fn') =
   catMaybes [namedArg "$fa" . show <$> fa', namedArg "$fs" . show <$> fs', namedArg "$fn" . show <$> fn']
-
-rFacet :: Show a => String -> a -> String
-rFacet name a = "$" ++ name ++ "=" ++ show a
-
--- Convenience functions for Facets.
 
 -- | 'var' uses @assign@ to set a 'Facet' variable for it's 'Model's.
 var :: Facets -> [Model v] -> Model v
