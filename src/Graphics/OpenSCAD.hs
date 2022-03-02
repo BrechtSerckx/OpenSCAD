@@ -574,7 +574,7 @@ hull = Hull
 -- returning an OpenSCAD program in a 'String'.
 render :: Vector v => Model v -> String
 render (Shape s) = rShape s
-render (Solid s) = rSolid s
+render (Solid s) = renderSolid s
 render (Union ss) = rList "union()" ss
 render (Intersection ss) = rList "intersection()" ss
 render (Difference s1 s2) = "difference(){" ++ render s1 ++ render s2 ++ "}\n"
@@ -605,31 +605,34 @@ render (Var facets ss) = rList ("let(" ++ rFacets facets ++ ")") ss
 -- utility for rendering Shapes.
 rShape :: Shape -> String
 rShape = \case
-  Rectangle r f -> renderAction "square" [(Nothing, renderList [show r, show f])]
-  Circle r facets -> renderAction "circle" ((Nothing, show r) : facetsToArgs facets) -- FIXME: rFacets'
+  Rectangle r f ->
+    renderAction "square" [renderList [show r, show f]]
+  Circle r facets ->
+    renderAction "circle" $ show r : renderFacetsArgs facets
   Projection c s ->
-    renderOperator
-      "projection"
-      [(Just "cut", renderBool c)]
-      s
-  Polygon c points paths -> renderAction "polygon" [(Just "points", rVectorL points), (Just "paths", show paths), (Just "convexity", show c)]
+    renderOperator "projection" [namedArg "cut" $ renderBool c] s
+  Polygon c points paths ->
+    renderAction
+      "polygon"
+      [ namedArg "points" $ rVectorL points,
+        namedArg "paths" $ show paths,
+        namedArg "convexity" $ show c
+      ]
 
-renderAction :: String -> [(Maybe String, String)] -> String
+renderAction :: String -> [String] -> String
 renderAction name args = name ++ renderArgs args ++ ";\n"
 
-renderOperator :: Vector v => String -> [(Maybe String, String)] -> Model v -> String
+renderOperator :: Vector v => String -> [String] -> Model v -> String
 renderOperator name args m = name ++ renderArgs args ++ " " ++ render m
 
 renderBool :: Bool -> String
 renderBool b = if b then "true" else "false"
 
-renderArgs :: [(Maybe String, String)] -> String
-renderArgs args = "(" ++ intercalate "," (uncurry renderArg <$> args) ++ ")"
+renderArgs :: [String] -> String
+renderArgs args = "(" ++ intercalate "," args ++ ")"
 
-renderArg :: Maybe String -> String -> String
-renderArg mName val = case mName of
-  Just name -> name ++ "=" ++ val
-  Nothing -> val
+namedArg :: String -> String -> String
+namedArg name val = name ++ "=" ++ val
 
 renderList :: [String] -> String
 renderList l = "[" ++ intercalate "," l ++ "]"
@@ -641,52 +644,60 @@ rJoin Round = "join_type=round"
 rJoin (Miter l) = "miter_limit=" ++ show l
 
 -- utilities for rendering Solids.
-rSolid :: Solid -> String
-rSolid (Sphere x f) = "sphere(" ++ show x ++ rFacets' f ++ ");\n"
-rSolid (Box x y z) =
-  "cube([" ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]);\n"
-rSolid (Cylinder r h f) =
-  "cylinder(r=" ++ show r ++ ",h=" ++ show h ++ rFacets' f ++ ");\n"
-rSolid (ObCylinder r1 h r2 f) =
-  "cylinder(r1=" ++ show r1 ++ ",h=" ++ show h ++ ",r2=" ++ show r2 ++ rFacets' f
-    ++ ");\n"
-rSolid (Polyhedron c ps ss) =
-  "polyhedron(points=" ++ rVectorL ps ++ rSides ss
-    ++ ",convexity="
-    ++ show c
-    ++ ");\n"
-rSolid (MultMatrix (a, b, c, d) s) =
-  "multmatrix([" ++ rQuad a ++ "," ++ rQuad b ++ "," ++ rQuad c ++ ","
-    ++ rQuad d
-    ++ "])\n"
-    ++ render s
-rSolid (LinearExtrude h t sc sl c f sh) =
-  "linear_extrude(height=" ++ show h ++ ",twist=" ++ show t ++ ",scale="
-    ++ rVector sc
-    ++ ",slices="
-    ++ show sl
-    ++ ",convexity="
-    ++ show c
-    ++ rFacets' f
-    ++ ")"
-    ++ render sh
-rSolid (RotateExtrude c f sh) =
-  "rotate_extrude(convexity=" ++ show c ++ rFacets' f ++ ")" ++ render sh
-rSolid (Surface f i c) =
-  "surface(file=\"" ++ f ++ "\"," ++ (if i then "invert=true," else "")
-    ++ "convexity="
-    ++ show c
-    ++ ");\n"
-rSolid (ToSolid s) = render s
+renderSolid :: Solid -> String
+renderSolid = \case
+  Sphere x f ->
+    renderAction "sphere" (show x : renderFacetsArgs f)
+  Box x y z ->
+    renderAction "cube" [renderList [show x, show y, show z]]
+  Cylinder r h f ->
+    renderAction "cylinder" $
+      [namedArg "r" $ show r, namedArg "h" $ show h] ++ renderFacetsArgs f
+  ObCylinder r1 h r2 f ->
+    renderAction "cylinder" $
+      [namedArg "r1" $ show r1, namedArg "h" $ show h, namedArg "r2" $ show r2]
+        ++ renderFacetsArgs f
+  Polyhedron c ps ss ->
+    renderAction
+      "polyhedron"
+      [ namedArg "points" $ rVectorL ps,
+        renderSidesArgs ss,
+        namedArg "convexity" $
+          show c
+      ]
+  MultMatrix (a, b, c, d) s ->
+    renderOperator "multmatrix" [renderList [rQuad a, rQuad b, rQuad c, rQuad d]] s
+  LinearExtrude h t sc sl c f sh ->
+    renderOperator
+      "linear_extrude"
+      ( [ namedArg "height" $ show h,
+          namedArg "twist" $ show t,
+          namedArg "scale" $ rVector sc,
+          namedArg "slices" $ show sl,
+          namedArg "convexity" $ show c
+        ]
+          ++ renderFacetsArgs f
+      )
+      sh
+  RotateExtrude c f sh ->
+    renderOperator "rotate_extrude" (namedArg "convexity" (show c) : renderFacetsArgs f) sh
+  Surface f i c ->
+    renderAction
+      "surface"
+      [ namedArg "file" ("\"" ++ f ++ "\""),
+        namedArg "invert" $ renderBool i,
+        namedArg "convexity" $ show c
+      ]
+  ToSolid s -> render s
 
 -- render a list of vectors as an Openscad vector of vectors.
 rVectorL :: Vector v => [v] -> [Char]
 rVectorL vs = "[" ++ intercalate "," (map rVector vs) ++ "]"
 
 -- render a Sides.
-rSides :: Sides -> [Char]
-rSides (Faces vs) = ",faces=" ++ rListL vs
-rSides (Triangles vs) = ",triangles=" ++ rListL vs
+renderSidesArgs :: Sides -> String
+renderSidesArgs (Faces vs) = namedArg "faces" $ rListL vs
+renderSidesArgs (Triangles vs) = namedArg "triangles" $ rListL vs
 
 rListL :: Show a => [a] -> [Char]
 rListL vs = "[" ++ intercalate "," (map show vs) ++ "]"
@@ -721,14 +732,9 @@ rFacets :: Facets -> [Char]
 rFacets (Facets fa' fs' fn') =
   intercalate "," $ catMaybes [rFacet "fa" <$> fa', rFacet "fs" <$> fs', rFacet "fn" <$> fn']
 
-facetsToArgs :: Facets -> [(Maybe String, String)]
-facetsToArgs (Facets fa' fs' fn') =
-  catMaybes [(Just "$fa",) . show <$> fa', (Just "$fs",) . show <$> fs', (Just "$fn",) . show <$> fn']
-
-rFacets' :: Facets -> [Char]
-rFacets' facets = case rFacets facets of
-  "" -> ""
-  s -> "," ++ s
+renderFacetsArgs :: Facets -> [String]
+renderFacetsArgs (Facets fa' fs' fn') =
+  catMaybes [namedArg "$fa" . show <$> fa', namedArg "$fs" . show <$> fs', namedArg "$fn" . show <$> fn']
 
 rFacet :: Show a => String -> a -> String
 rFacet name a = "$" ++ name ++ "=" ++ show a

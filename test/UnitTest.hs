@@ -183,7 +183,7 @@ tests =
             ],
           testGroup
             "Surface"
-            [ st "Normal" "surface(file=\"test.dat\",convexity=5);" $
+            [ st "Normal" "surface(file=\"test.dat\",invert=false,convexity=5);" $
                 surface "test.dat" False 5,
               st "Inverted" "surface(file=\"test.dat\",invert=true,convexity=5);" $
                 surface "test.dat" True 5 -- Requires  2014.QX
