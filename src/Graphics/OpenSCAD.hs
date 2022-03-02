@@ -597,7 +597,7 @@ render = \case
   Transparent c s ->
     renderOperator
       "color"
-      [rQuad (channelRed r, channelGreen r, channelBlue r, a)]
+      [renderList $ show <$> [channelRed r, channelGreen r, channelBlue r, a]]
       [s]
     where
       r = toSRGB $ toPure c
@@ -619,7 +619,7 @@ renderShape = \case
   Polygon c points paths ->
     renderAction
       "polygon"
-      [ namedArg "points" $ rVectorL points,
+      [ namedArg "points" . renderList $ rVector <$> points,
         namedArg "paths" $ show paths,
         namedArg "convexity" $ show c
       ]
@@ -669,13 +669,15 @@ renderSolid = \case
   Polyhedron c ps ss ->
     renderAction
       "polyhedron"
-      [ namedArg "points" $ rVectorL ps,
+      [ namedArg "points" . renderList $ rVector <$> ps,
         renderSidesArgs ss,
-        namedArg "convexity" $
-          show c
+        namedArg "convexity" $ show c
       ]
   MultMatrix (a, b, c, d) s ->
-    renderOperator "multmatrix" [renderList [rQuad a, rQuad b, rQuad c, rQuad d]] [s]
+    renderOperator
+      "multmatrix"
+      [renderList $ renderQuad <$> [a, b, c, d]]
+      [s]
   LinearExtrude h t sc sl c f sh ->
     renderOperator
       "linear_extrude"
@@ -699,17 +701,10 @@ renderSolid = \case
       ]
   ToSolid s -> render s
 
--- render a list of vectors as an Openscad vector of vectors.
-rVectorL :: Vector v => [v] -> [Char]
-rVectorL vs = "[" ++ intercalate "," (map rVector vs) ++ "]"
-
 -- render a Sides.
 renderSidesArgs :: Sides -> String
-renderSidesArgs (Faces vs) = namedArg "faces" $ rListL vs
-renderSidesArgs (Triangles vs) = namedArg "triangles" $ rListL vs
-
-rListL :: Show a => [a] -> [Char]
-rListL vs = "[" ++ intercalate "," (map show vs) ++ "]"
+renderSidesArgs (Faces vs) = namedArg "faces" . renderList $ show <$> vs
+renderSidesArgs (Triangles vs) = namedArg "triangles" . renderList $ show <$> vs
 
 -- | A convenience function to render a list of 'Model's by taking
 -- their union.
@@ -726,8 +721,8 @@ draw = putStrLn . render
 drawL :: Vector v => [Model v] -> IO ()
 drawL = draw . Union
 
-rQuad :: (Show a, Show b, Show c, Show d) => (a, b, c, d) -> [Char]
-rQuad (w, x, y, z) =
+renderQuad :: (Show a, Show b, Show c, Show d) => (a, b, c, d) -> [Char]
+renderQuad (w, x, y, z) =
   "[" ++ show w ++ "," ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]"
 
 renderFacets :: Facets -> [String]
