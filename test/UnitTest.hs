@@ -183,7 +183,7 @@ tests =
             ],
           testGroup
             "Surface"
-            [ st "Normal" "surface(file=\"test.dat\",convexity=5);" $
+            [ st "Normal" "surface(file=\"test.dat\",invert=false,convexity=5);" $
                 surface "test.dat" False 5,
               st "Inverted" "surface(file=\"test.dat\",invert=true,convexity=5);" $
                 surface "test.dat" True 5 -- Requires  2014.QX
@@ -325,15 +325,15 @@ tests =
         "Facets"
         [ st
             "facet 1"
-            "let($fn=100){sphere(2.0,$fn=100);}"
+            "let($fn=100) sphere(2.0,$fn=100);"
             (var (fn 100) [sphere 2 $ fn 100]),
           st
             "facet 2"
-            "let($fa=5.0){sphere(2.0,$fa=5.0);}"
+            "let($fa=5.0) sphere(2.0,$fa=5.0);"
             (var (fa 5) [sphere 2 $ fa 5]),
           st
             "facet 3"
-            "let($fs=0.1){sphere(2.0,$fs=0.1);}"
+            "let($fs=0.1) sphere(2.0,$fs=0.1);"
             (var (fs 0.1) [sphere 2 $ fs 0.1])
         ],
       testGroup

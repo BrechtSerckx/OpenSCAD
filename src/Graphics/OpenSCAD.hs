@@ -573,105 +573,138 @@ hull = Hull
 -- | 'render' does all the real work. It will walk the AST for a 'Model',
 -- returning an OpenSCAD program in a 'String'.
 render :: Vector v => Model v -> String
-render (Shape s) = rShape s
-render (Solid s) = rSolid s
-render (Union ss) = rList "union()" ss
-render (Intersection ss) = rList "intersection()" ss
-render (Difference s1 s2) = "difference(){" ++ render s1 ++ render s2 ++ "}\n"
-render (Minkowski ss) = rList "minkowski()" ss
-render (Hull ss) = rList "hull()" ss
-render (Scale v s) = rVecSolid "scale" v s
-render (Resize v s) = rVecSolid "resize" v s
-render (Translate v s) = rVecSolid "translate" v s
-render (Rotate2d v s) = "rotate(" ++ rVector ((0, 0, v) :: Vector3d) ++ ")" ++ render s
-render (Rotate3d v s) = "rotate(" ++ rVector v ++ ")" ++ render s
-render (Mirror v s) = rVecSolid "mirror" v s
-render (Import f) = "import(\"" ++ f ++ "\");\n"
-render (Color c s) =
-  let r = toSRGB c
-   in "color(" ++ rVector (channelRed r, channelGreen r, channelBlue r) ++ ")\n"
-        ++ render s
-render (Transparent c s) =
-  "color(" ++ rQuad (channelRed r, channelGreen r, channelBlue r, a) ++ ")"
-    ++ render s
-  where
-    r = toSRGB $ toPure c
-    a = alphaChannel c
-    toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
-render (Offset d j m) =
-  "offset(delta=" ++ show d ++ "," ++ rJoin j ++ ")" ++ render m
-render (Var facets ss) = rList ("let(" ++ rFacets facets ++ ")") ss
+render = \case
+  Shape s -> renderShape s
+  Solid s -> renderSolid s
+  Union ss -> renderOperator "union" [] ss
+  Intersection ss -> renderOperator "intersection" [] ss
+  Difference s1 s2 -> renderOperator "difference" [] [s1, s2]
+  Minkowski ss -> renderOperator "minkowski" [] ss
+  Hull ss -> renderOperator "hull" [] ss
+  Scale v s -> renderOperator "scale" [rVector v] [s]
+  Resize v s -> renderOperator "resize" [rVector v] [s]
+  Translate v s -> renderOperator "translate" [rVector v] [s]
+  Rotate2d v s -> renderOperator "rotate" [rVector ((0, 0, v) :: Vector3d)] [s]
+  Rotate3d v s -> renderOperator "rotate" [rVector v] [s]
+  Mirror v s -> renderOperator "mirror" [rVector v] [s]
+  Import f -> renderAction "import" ["\"" ++ f ++ "\""]
+  Color c s ->
+    let r = toSRGB c
+     in renderOperator
+          "color"
+          [rVector (channelRed r, channelGreen r, channelBlue r)]
+          [s]
+  Transparent c s ->
+    renderOperator
+      "color"
+      [renderList $ show <$> [channelRed r, channelGreen r, channelBlue r, a]]
+      [s]
+    where
+      r = toSRGB $ toPure c
+      a = alphaChannel c
+      toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
+  Offset d j m ->
+    renderOperator "offset" [namedArg "delta" $ show d, renderJoin j] [m]
+  Var facets ss -> renderOperator "let" (renderFacets facets) ss
 
 -- utility for rendering Shapes.
-rShape :: Shape -> String
-rShape (Rectangle r f) = "square([" ++ show r ++ "," ++ show f ++ "]);\n"
-rShape (Circle r facets) = "circle(" ++ show r ++ rFacets' facets ++ ");\n"
-rShape (Projection c s) =
-  "projection(cut=" ++ (if c then "true)" else "false)") ++ render s
-rShape (Polygon c points paths) =
-  "polygon(points=" ++ rVectorL points
-    ++ ",paths="
-    ++ show paths
-    ++ ",convexity="
-    ++ show c
-    ++ ");\n"
+renderShape :: Shape -> String
+renderShape = \case
+  Rectangle r f ->
+    renderAction "square" [renderList [show r, show f]]
+  Circle r facets ->
+    renderAction "circle" $ show r : renderFacets facets
+  Projection c s ->
+    renderOperator "projection" [namedArg "cut" $ renderBool c] [s]
+  Polygon c points paths ->
+    renderAction
+      "polygon"
+      [ namedArg "points" . renderList $ rVector <$> points,
+        namedArg "paths" $ show paths,
+        namedArg "convexity" $ show c
+      ]
+
+renderAction :: String -> [String] -> String
+renderAction name args = name ++ renderArgs args ++ ";\n"
+
+renderOperator :: Vector v => String -> [String] -> [Model v] -> String
+renderOperator name args ms =
+  let renderMs = case ms of
+        [m] -> render m
+        _ -> "{" ++ concatMap render ms ++ "}"
+   in name ++ renderArgs args ++ " " ++ renderMs
+
+renderBool :: Bool -> String
+renderBool b = if b then "true" else "false"
+
+renderArgs :: [String] -> String
+renderArgs args = "(" ++ intercalate "," args ++ ")"
+
+namedArg :: String -> String -> String
+namedArg name val = name ++ "=" ++ val
+
+renderList :: [String] -> String
+renderList l = "[" ++ intercalate "," l ++ "]"
 
 -- utility for rendering Joins
-rJoin :: Join -> String
-rJoin Bevel = "join_type=bevel"
-rJoin Round = "join_type=round"
-rJoin (Miter l) = "miter_limit=" ++ show l
+renderJoin :: Join -> String
+renderJoin Bevel = namedArg "join_type" "bevel"
+renderJoin Round = namedArg "join_type" "round"
+renderJoin (Miter l) = namedArg "miter_limit" $ show l
 
 -- utilities for rendering Solids.
-rSolid :: Solid -> String
-rSolid (Sphere x f) = "sphere(" ++ show x ++ rFacets' f ++ ");\n"
-rSolid (Box x y z) =
-  "cube([" ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]);\n"
-rSolid (Cylinder r h f) =
-  "cylinder(r=" ++ show r ++ ",h=" ++ show h ++ rFacets' f ++ ");\n"
-rSolid (ObCylinder r1 h r2 f) =
-  "cylinder(r1=" ++ show r1 ++ ",h=" ++ show h ++ ",r2=" ++ show r2 ++ rFacets' f
-    ++ ");\n"
-rSolid (Polyhedron c ps ss) =
-  "polyhedron(points=" ++ rVectorL ps ++ rSides ss
-    ++ ",convexity="
-    ++ show c
-    ++ ");\n"
-rSolid (MultMatrix (a, b, c, d) s) =
-  "multmatrix([" ++ rQuad a ++ "," ++ rQuad b ++ "," ++ rQuad c ++ ","
-    ++ rQuad d
-    ++ "])\n"
-    ++ render s
-rSolid (LinearExtrude h t sc sl c f sh) =
-  "linear_extrude(height=" ++ show h ++ ",twist=" ++ show t ++ ",scale="
-    ++ rVector sc
-    ++ ",slices="
-    ++ show sl
-    ++ ",convexity="
-    ++ show c
-    ++ rFacets' f
-    ++ ")"
-    ++ render sh
-rSolid (RotateExtrude c f sh) =
-  "rotate_extrude(convexity=" ++ show c ++ rFacets' f ++ ")" ++ render sh
-rSolid (Surface f i c) =
-  "surface(file=\"" ++ f ++ "\"," ++ (if i then "invert=true," else "")
-    ++ "convexity="
-    ++ show c
-    ++ ");\n"
-rSolid (ToSolid s) = render s
-
--- render a list of vectors as an Openscad vector of vectors.
-rVectorL :: Vector v => [v] -> [Char]
-rVectorL vs = "[" ++ intercalate "," (map rVector vs) ++ "]"
+renderSolid :: Solid -> String
+renderSolid = \case
+  Sphere x f ->
+    renderAction "sphere" (show x : renderFacets f)
+  Box x y z ->
+    renderAction "cube" [renderList [show x, show y, show z]]
+  Cylinder r h f ->
+    renderAction "cylinder" $
+      [namedArg "r" $ show r, namedArg "h" $ show h] ++ renderFacets f
+  ObCylinder r1 h r2 f ->
+    renderAction "cylinder" $
+      [namedArg "r1" $ show r1, namedArg "h" $ show h, namedArg "r2" $ show r2]
+        ++ renderFacets f
+  Polyhedron c ps ss ->
+    renderAction
+      "polyhedron"
+      [ namedArg "points" . renderList $ rVector <$> ps,
+        renderSidesArgs ss,
+        namedArg "convexity" $ show c
+      ]
+  MultMatrix (a, b, c, d) s ->
+    renderOperator
+      "multmatrix"
+      [renderList $ renderQuad <$> [a, b, c, d]]
+      [s]
+  LinearExtrude h t sc sl c f sh ->
+    renderOperator
+      "linear_extrude"
+      ( [ namedArg "height" $ show h,
+          namedArg "twist" $ show t,
+          namedArg "scale" $ rVector sc,
+          namedArg "slices" $ show sl,
+          namedArg "convexity" $ show c
+        ]
+          ++ renderFacets f
+      )
+      [sh]
+  RotateExtrude c f sh ->
+    renderOperator "rotate_extrude" (namedArg "convexity" (show c) : renderFacets f) [sh]
+  Surface f i c ->
+    renderAction
+      "surface"
+      [ namedArg "file" ("\"" ++ f ++ "\""),
+        namedArg "invert" $ renderBool i,
+        namedArg "convexity" $ show c
+      ]
+  ToSolid s -> render s
 
 -- render a Sides.
-rSides :: Sides -> [Char]
-rSides (Faces vs) = ",faces=" ++ rListL vs
-rSides (Triangles vs) = ",triangles=" ++ rListL vs
-
-rListL :: Show a => [a] -> [Char]
-rListL vs = "[" ++ intercalate "," (map show vs) ++ "]"
+renderSidesArgs :: Sides -> String
+renderSidesArgs (Faces vs) = namedArg "faces" . renderList $ show <$> vs
+renderSidesArgs (Triangles vs) = namedArg "triangles" . renderList $ show <$> vs
 
 -- | A convenience function to render a list of 'Model's by taking
 -- their union.
@@ -688,30 +721,13 @@ draw = putStrLn . render
 drawL :: Vector v => [Model v] -> IO ()
 drawL = draw . Union
 
--- And some misc. rendering utilities.
-rList :: (Foldable t, Vector v) => [Char] -> t (Model v) -> [Char]
-rList n ss = n ++ "{\n" ++ concatMap render ss ++ "}"
-
-rVecSolid :: Vector v => [Char] -> v -> Model v -> [Char]
-rVecSolid n v s = n ++ "(" ++ rVector v ++ ")\n" ++ render s
-
-rQuad :: (Show a, Show b, Show c, Show d) => (a, b, c, d) -> [Char]
-rQuad (w, x, y, z) =
+renderQuad :: (Show a, Show b, Show c, Show d) => (a, b, c, d) -> [Char]
+renderQuad (w, x, y, z) =
   "[" ++ show w ++ "," ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]"
 
-rFacets :: Facets -> [Char]
-rFacets (Facets fa' fs' fn') =
-  intercalate "," $ catMaybes [rFacet "fa" <$> fa', rFacet "fs" <$> fs', rFacet "fn" <$> fn']
-
-rFacets' :: Facets -> [Char]
-rFacets' facets = case rFacets facets of
-  "" -> ""
-  s -> "," ++ s
-
-rFacet :: Show a => String -> a -> String
-rFacet name a = "$" ++ name ++ "=" ++ show a
-
--- Convenience functions for Facets.
+renderFacets :: Facets -> [String]
+renderFacets (Facets fa' fs' fn') =
+  catMaybes [namedArg "$fa" . show <$> fa', namedArg "$fs" . show <$> fs', namedArg "$fn" . show <$> fn']
 
 -- | 'var' uses @assign@ to set a 'Facet' variable for it's 'Model's.
 var :: Facets -> [Model v] -> Model v
