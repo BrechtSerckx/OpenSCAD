@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 -- |
@@ -197,10 +198,12 @@ import qualified Data.Char as Char
 import Data.Colour (AlphaColour, Colour, alphaChannel, darken, over)
 import Data.Colour.Names as Colours
 import Data.Colour.SRGB (channelBlue, channelGreen, channelRed, toSRGB)
+import Data.List (elemIndices, nub)
 import Data.LanguageCodes (ISO639_1)
-import Data.List (elemIndices, intercalate, nub)
 import Data.Maybe (catMaybes)
 import qualified Data.Set as Set
+import Prettyprinter ((<+>))
+import qualified Prettyprinter as PP
 
 -- A vector in 2 or 3-space. They are used in transformations of
 -- 'Model's of their type.
@@ -641,186 +644,197 @@ hull = ListOp Hull
 -- | 'render' does all the real work. It will walk the AST for a 'Model',
 -- returning an OpenSCAD program in a 'String'.
 render :: Vector v => Model v -> String
-render = \case
-  Shape s -> renderShape s
-  Solid s -> renderSolid s
-  UnaryOp op m -> renderUnaryOp op m
-  BinaryOp op m1 m2 -> renderBinaryOp op m1 m2
-  ListOp op ms -> renderListOp op ms
-  Projection c m -> renderOperator "projection" [namedArg "cut" $ renderBool c] [m]
-  LinearExtrude h t sc sl c f m ->
-    renderOperator
-      "linear_extrude"
-      ( [ namedArg "height" $ show h,
-          namedArg "twist" $ show t,
-          namedArg "scale" $ rVector sc,
-          namedArg "slices" $ show sl,
-          namedArg "convexity" $ show c
-        ]
-          ++ renderFacets f
-      )
-      [m]
-  RotateExtrude c f m -> renderOperator "rotate_extrude" (namedArg "convexity" (show c) : renderFacets f) [m]
-  Import f -> renderAction "import" ["\"" ++ f ++ "\""]
-  Var facets ss -> renderOperator "let" (renderFacets facets) ss
+render = show . PP.pretty
 
-renderUnaryOp :: Vector v1 => UnaryOp v1 -> Model v1 -> String
-renderUnaryOp = \case
-  Scale v -> renderOp "scale" [rVector v]
-  Resize v -> renderOp "resize" [rVector v]
-  Translate v -> renderOp "translate" [rVector v]
-  Rotate2d v -> renderOp "rotate" [rVector ((0, 0, v) :: Vector3d)]
-  Rotate3d v -> renderOp "rotate" [rVector v]
-  Mirror v -> renderOp "mirror" [rVector v]
-  MultMatrix (a, b, c, d) -> renderOp "multmatrix" [renderList $ renderQuad <$> [a, b, c, d]]
-  Color c ->
-    let r = toSRGB c
-     in renderOp "color" [rVector (channelRed r, channelGreen r, channelBlue r)]
-  Transparent c ->
-    renderOp
-      "color"
-      [renderList $ show <$> [channelRed r, channelGreen r, channelBlue r, a]]
+instance Vector v => PP.Pretty (Model v) where
+  pretty =
+    PP.group . \case
+      Shape s -> PP.pretty s
+      Solid s -> PP.pretty s
+      UnaryOp op m -> renderTransform (PP.pretty op) [m]
+      BinaryOp op m1 m2 -> renderTransform (PP.pretty op) [m1, m2]
+      ListOp op ms -> renderTransform (PP.pretty op) ms
+      Projection c m -> renderTransform (renderOperator "projection" [namedArg "cut" $ renderBool c]) [m]
+      LinearExtrude h t sc sl c f m ->
+        renderTransform
+          ( renderOperator
+              "linear_extrude"
+              $ [ namedArg "height" $ PP.pretty h,
+                  namedArg "twist" $ PP.pretty t,
+                  namedArg "scale" $ PP.pretty $ rVector sc, -- FIXME
+                  namedArg "slices" $ PP.pretty sl,
+                  namedArg "convexity" $ PP.pretty c
+                ]
+                ++ facetsToArgs f
+          )
+          [m]
+      RotateExtrude c f m ->
+        renderTransform
+          ( renderOperator "rotate_extrude" $
+              namedArg "convexity" (PP.pretty c) : facetsToArgs f
+          )
+          [m]
+      Import f -> renderAction "import" [PP.pretty $ "\"" ++ f ++ "\""]
+      Var facets ss ->
+        renderTransform
+          (renderOperator "let" $ facetsToArgs facets)
+          ss
     where
-      r = toSRGB $ toPure c
-      a = alphaChannel c
-      toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
-  Offset d j ->
-    renderOp "offset" [namedArg "delta" $ show d, renderJoin j]
-  where
-    renderOp name args m = renderOperator name args [m]
+      renderTransform op ms = op <+> renderSubModels ms
+      renderSubModels :: Vector v => [Model v] -> PP.Doc ann
+      renderSubModels = \case
+        [m] -> PP.nest 2 $ PP.line' <> PP.pretty m
+        ms ->
+          PP.braces
+            . PP.enclose PP.line' PP.line'
+            . PP.indent 2
+            . PP.vsep
+            $ PP.pretty <$> ms
 
-renderBinaryOp :: Vector v => BinaryOp v -> Model v -> Model v -> String
-renderBinaryOp = \case
-  Difference -> renderOp "difference" []
-  where
-    renderOp name args m1 m2 = renderOperator name args [m1, m2]
+instance Vector v => PP.Pretty (UnaryOp v) where
+  pretty = \case
+    Scale v -> renderOperator "scale" [PP.pretty $ rVector v]
+    Resize v -> renderOperator "resize" [PP.pretty $ rVector v]
+    Translate v -> renderOperator "translate" [PP.pretty $ rVector v]
+    Rotate2d v -> renderOperator "rotate" [PP.pretty $ rVector ((0, 0, v) :: Vector3d)]
+    Rotate3d v -> renderOperator "rotate" [PP.pretty $ rVector v]
+    Mirror v -> renderOperator "mirror" [PP.pretty $ rVector v]
+    MultMatrix (a, b, c, d) ->
+      let q2list (w, x, y, z) = [w, x, y, z]
+       in renderOperator
+            "multmatrix"
+            [PP.align . PP.list $ PP.list . fmap PP.pretty . q2list <$> [a, b, c, d]]
+    Color c ->
+      let r = toSRGB c
+       in renderOperator
+            "color"
+            [PP.pretty $ rVector (channelRed r, channelGreen r, channelBlue r)]
+    Transparent c ->
+      renderOperator
+        "color"
+        [PP.list $ PP.pretty <$> [channelRed r, channelGreen r, channelBlue r, a]]
+      where
+        r = toSRGB $ toPure c
+        a = alphaChannel c
+        toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
+    Offset d j ->
+      let join = case j of
+            Bevel -> namedArg "join_type" "bevel"
+            Round -> namedArg "join_type" "round"
+            Miter l -> namedArg "miter_limit" $ PP.pretty l
+       in renderOperator "offset" [namedArg "delta" $ PP.pretty d, join]
 
-renderListOp :: Vector v => ListOp v -> [Model v] -> String
-renderListOp = \case
-  Union -> renderOp "union" []
-  Intersection -> renderOp "intersection" []
-  Minkowski -> renderOp "minkowski" []
-  Hull -> renderOp "hull" []
-  where
-    renderOp name args ms = renderOperator name args ms
+instance Vector v => PP.Pretty (BinaryOp v) where
+  pretty = \case
+    Difference -> renderOperator "difference" []
 
--- utility for rendering Shapes.
-renderShape :: Shape -> String
-renderShape = \case
-  Rectangle r f ->
-    renderAction "square" [renderList [show r, show f]]
-  Circle r facets ->
-    renderAction "circle" $ show r : renderFacets facets
-  Polygon c points paths ->
-    renderAction
-      "polygon"
-      [ namedArg "points" . renderList $ rVector <$> points,
-        namedArg "paths" $ show paths,
-        namedArg "convexity" $ show c
-      ]
-  Text t c ->
-    renderAction "text" $
-      namedArg "text" (show t) : renderTextConfig c
+instance Vector v => PP.Pretty (ListOp v) where
+  pretty = \case
+    Union -> renderOperator "union" []
+    Intersection -> renderOperator "intersection" []
+    Minkowski -> renderOperator "minkowski" []
+    Hull -> renderOperator "hull" []
 
-renderAction :: String -> [String] -> String
-renderAction name args = name ++ renderArgs args ++ ";\n"
-
-renderOperator :: Vector v => String -> [String] -> [Model v] -> String
-renderOperator name args ms =
-  let renderMs = case ms of
-        [m] -> render m
-        _ -> "{" ++ concatMap render ms ++ "}"
-   in name ++ renderArgs args ++ " " ++ renderMs
-
-renderBool :: Bool -> String
-renderBool b = if b then "true" else "false"
-
-renderArgs :: [String] -> String
-renderArgs args = "(" ++ intercalate "," args ++ ")"
-
-namedArg :: String -> String -> String
-namedArg name val = name ++ "=" ++ val
-
-renderList :: [String] -> String
-renderList l = "[" ++ intercalate "," l ++ "]"
+instance PP.Pretty Shape where
+  pretty = \case
+    Rectangle r f -> renderAction "square" [PP.list $ PP.pretty <$> [r, f]]
+    Circle r facets ->
+      renderAction "circle" $ PP.pretty r : facetsToArgs facets
+    Polygon c points paths ->
+      renderAction
+        "polygon"
+        [ namedArg "points" . PP.list $ PP.pretty . rVector <$> points,
+          namedArg "paths" $ PP.pretty paths,
+          namedArg "convexity" $ PP.pretty c
+        ]
+    Text t c ->
+      renderAction "text" $
+        namedArg "text" (PP.dquotes $ PP.pretty t) : renderTextConfig c
 
 -- | Render `TextConfig` as args
-renderTextConfig :: TextConfig -> [String]
+renderTextConfig :: TextConfig -> [PP.Doc ann]
 renderTextConfig (TextConfig mSize mFont mHAlign mVAlign mSpacing mDirection mLanguage mScript mFn) =
   catMaybes
-    [ namedArg "size" . show <$> mSize,
-      namedArg "font" . show <$> mFont,
+    [ namedArg "size" . PP.pretty <$> mSize,
+      namedArg "font" . PP.dquotes . PP.pretty <$> mFont,
       namedArg "halign" . renderTextHAlign <$> mHAlign,
       namedArg "valign" . renderTextVAlign <$> mVAlign,
-      namedArg "spacing" . show <$> mSpacing,
+      namedArg "spacing" . PP.pretty <$> mSpacing,
       namedArg "direction" . renderTextDirection <$> mDirection,
-      namedArg "language" . show . map Char.toLower . show <$> mLanguage,
-      namedArg "script" . show <$> mScript,
-      namedArg "$fn" . show <$> mFn
+      namedArg "language" . PP.dquotes . PP.pretty . map Char.toLower . show <$> mLanguage,
+      namedArg "script" . PP.dquotes . PP.pretty <$> mScript,
+      namedArg "$fn" . PP.pretty <$> mFn
     ]
 
-renderTextHAlign :: TextHAlign -> String
+renderTextHAlign :: TextHAlign -> PP.Doc ann
 renderTextHAlign =
-  show . \case
+  PP.dquotes . \case
     HLeft -> "left"
     HCenter -> "center"
     HRight -> "right"
 
-renderTextVAlign :: TextVAlign -> String
+renderTextVAlign :: TextVAlign -> PP.Doc ann
 renderTextVAlign =
-  show . \case
+  PP.dquotes . \case
     VTop -> "top"
     VCenter -> "center"
     VBaseline -> "baseline"
     VBottom -> "bottom"
 
-renderTextDirection :: TextDirection -> String
+renderTextDirection :: TextDirection -> PP.Doc ann
 renderTextDirection =
-  show . \case
+  PP.dquotes . \case
     LeftToRight -> "ltr"
     RightToLeft -> "rtl"
     TopToBottom -> "ttb"
     BottomToTop -> "btt"
 
--- utility for rendering Joins
-renderJoin :: Join -> String
-renderJoin Bevel = namedArg "join_type" "bevel"
-renderJoin Round = namedArg "join_type" "round"
-renderJoin (Miter l) = namedArg "miter_limit" $ show l
+renderAction :: PP.Doc ann -> [PP.Doc ann] -> PP.Doc ann
+renderAction name args =
+  PP.group $
+    name
+      <> PP.tupled args
+      <> PP.semi
 
--- utilities for rendering Solids.
-renderSolid :: Solid -> String
-renderSolid = \case
-  Sphere x f ->
-    renderAction "sphere" (show x : renderFacets f)
-  Box x y z ->
-    renderAction "cube" [renderList [show x, show y, show z]]
-  Cylinder r h f ->
-    renderAction "cylinder" $
-      [namedArg "r" $ show r, namedArg "h" $ show h] ++ renderFacets f
-  ObCylinder r1 h r2 f ->
-    renderAction "cylinder" $
-      [namedArg "r1" $ show r1, namedArg "h" $ show h, namedArg "r2" $ show r2]
-        ++ renderFacets f
-  Polyhedron c ps ss ->
-    renderAction
-      "polyhedron"
-      [ namedArg "points" . renderList $ rVector <$> ps,
-        renderSidesArgs ss,
-        namedArg "convexity" $ show c
-      ]
-  Surface f i c ->
-    renderAction
-      "surface"
-      [ namedArg "file" ("\"" ++ f ++ "\""),
-        namedArg "invert" $ renderBool i,
-        namedArg "convexity" $ show c
-      ]
+renderOperator :: PP.Doc ann -> [PP.Doc ann] -> PP.Doc ann
+renderOperator name args = PP.group $ name <> PP.align (PP.tupled args)
 
--- render a Sides.
-renderSidesArgs :: Sides -> String
-renderSidesArgs (Faces vs) = namedArg "faces" . renderList $ show <$> vs
-renderSidesArgs (Triangles vs) = namedArg "triangles" . renderList $ show <$> vs
+renderBool :: Bool -> PP.Doc ann
+renderBool b = if b then "true" else "false"
+
+namedArg :: PP.Doc ann -> PP.Doc ann -> PP.Doc ann
+namedArg name val = name <> "=" <> val
+
+instance PP.Pretty Solid where
+  pretty = \case
+    Sphere x f ->
+      renderAction "sphere" (PP.pretty x : facetsToArgs f)
+    Box x y z ->
+      renderAction "cube" [PP.list $ PP.pretty <$> [x, y, z]]
+    Cylinder r h f ->
+      renderAction "cylinder" $
+        [namedArg "r" $ PP.pretty r, namedArg "h" $ PP.pretty h] ++ facetsToArgs f
+    ObCylinder r1 h r2 f ->
+      renderAction "cylinder" $
+        [namedArg "r1" $ PP.pretty r1, namedArg "h" $ PP.pretty h, namedArg "r2" $ PP.pretty r2]
+          ++ facetsToArgs f
+    Polyhedron c ps ss ->
+      let sides = case ss of
+            Faces vs -> namedArg "faces" . PP.list $ PP.pretty <$> vs
+            Triangles vs -> namedArg "triangles" . PP.list $ PP.pretty <$> vs
+       in renderAction
+            "polyhedron"
+            [ namedArg "points" . PP.list $ PP.pretty . rVector <$> ps,
+              sides,
+              namedArg "convexity" $ PP.pretty c
+            ]
+    Surface f i c ->
+      renderAction
+        "surface"
+        [ namedArg "file" $ PP.dquotes (PP.pretty f),
+          namedArg "invert" $ renderBool i,
+          namedArg "convexity" $ PP.pretty c
+        ]
 
 -- | A convenience function to render a list of 'Model's by taking
 -- their union.
@@ -837,13 +851,13 @@ draw = putStrLn . render
 drawL :: Vector v => [Model v] -> IO ()
 drawL = draw . ListOp Union
 
-renderQuad :: (Show a, Show b, Show c, Show d) => (a, b, c, d) -> [Char]
-renderQuad (w, x, y, z) =
-  "[" ++ show w ++ "," ++ show x ++ "," ++ show y ++ "," ++ show z ++ "]"
-
-renderFacets :: Facets -> [String]
-renderFacets (Facets fa' fs' fn') =
-  catMaybes [namedArg "$fa" . show <$> fa', namedArg "$fs" . show <$> fs', namedArg "$fn" . show <$> fn']
+facetsToArgs :: Facets -> [PP.Doc ann]
+facetsToArgs (Facets fa' fs' fn') =
+  catMaybes
+    [ namedArg "$fa" . PP.pretty <$> fa',
+      namedArg "$fs" . PP.pretty <$> fs',
+      namedArg "$fn" . PP.pretty <$> fn'
+    ]
 
 -- | 'var' uses @assign@ to set a 'Facet' variable for it's 'Model's.
 var :: Facets -> [Model v] -> Model v
