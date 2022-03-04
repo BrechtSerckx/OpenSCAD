@@ -121,6 +121,13 @@ module Graphics.OpenSCAD
     -- ** Type for 'unsafePolyhedron' 'Sides' argument
     Sides (..),
 
+    -- ** Text Config
+    TextConfig (..),
+    defTextConfig,
+    TextHAlign (..),
+    TextVAlign (..),
+    TextDirection (..),
+
     -- * Primitive creation
 
     -- ** 'Model2d's
@@ -130,6 +137,7 @@ module Graphics.OpenSCAD
     polygon,
     unsafePolygon,
     projection,
+    text,
     offset,
     importFile,
 
@@ -186,10 +194,12 @@ module Graphics.OpenSCAD
   )
 where
 
+import qualified Data.Char as Char
 import Data.Colour (AlphaColour, Colour, alphaChannel, darken, over)
 import Data.Colour.Names as Colours
 import Data.Colour.SRGB (channelBlue, channelGreen, channelRed, toSRGB)
 import Data.List (elemIndices, nub)
+import Data.LanguageCodes (ISO639_1)
 import Data.Maybe (catMaybes)
 import qualified Data.Set as Set
 import Prettyprinter ((<+>))
@@ -284,10 +294,48 @@ data Shape
   = Rectangle Double Double
   | Circle Double Facets
   | Polygon Int [Vector2d] [[Int]]
+  | Text String TextConfig
   deriving (Show)
 
 -- | The third argument to unsafePolyhedron is a 'Sides'.
 data Sides = Faces [[Int]] | Triangles [[Int]] deriving (Show)
+
+data TextHAlign = HLeft | HCenter | HRight
+  deriving (Eq, Show)
+
+data TextVAlign = VTop | VCenter | VBaseline | VBottom
+  deriving (Eq, Show)
+
+data TextDirection = LeftToRight | RightToLeft | TopToBottom | BottomToTop
+  deriving (Eq, Show)
+
+-- | Text configuration
+data TextConfig = TextConfig
+  { textSize :: Maybe Double,
+    textFont :: Maybe String,
+    textHAlign :: Maybe TextHAlign,
+    textVAlign :: Maybe TextVAlign,
+    textSpacing :: Maybe Double,
+    textDirection :: Maybe TextDirection,
+    textLanguage :: Maybe ISO639_1,
+    textScript :: Maybe String,
+    textFn :: Maybe Int
+  }
+  deriving (Eq, Show)
+
+defTextConfig :: TextConfig
+defTextConfig =
+  TextConfig
+    { textSize = Nothing,
+      textFont = Nothing,
+      textHAlign = Nothing,
+      textVAlign = Nothing,
+      textSpacing = Nothing,
+      textDirection = Nothing,
+      textLanguage = Nothing,
+      textScript = Nothing,
+      textFn = Nothing
+    }
 
 -- | A 'Solid' is a 3-dimensional primitive to be used in a 'Model3d'.
 data Solid
@@ -380,6 +428,10 @@ circle r facets = Shape $ Circle r facets
 -- | Project a 'Model3d' into a 'Model' with @projection /cut 'Model3d'/@.
 projection :: Bool -> Model3d -> Model2d
 projection = Projection
+
+text :: String -> TextConfig -> Model2d
+text t c =
+  Shape $ Text t c
 
 -- | Turn a list of lists of 'Vector2d's and an Int into @polygon
 -- /convexity points path/@. The argument to polygon is the list of
@@ -695,6 +747,47 @@ instance PP.Pretty Shape where
           namedArg "paths" $ PP.pretty paths,
           namedArg "convexity" $ PP.pretty c
         ]
+    Text t c ->
+      renderAction "text" $
+        namedArg "text" (PP.dquotes $ PP.pretty t) : renderTextConfig c
+
+-- | Render `TextConfig` as args
+renderTextConfig :: TextConfig -> [PP.Doc ann]
+renderTextConfig (TextConfig mSize mFont mHAlign mVAlign mSpacing mDirection mLanguage mScript mFn) =
+  catMaybes
+    [ namedArg "size" . PP.pretty <$> mSize,
+      namedArg "font" . PP.dquotes . PP.pretty <$> mFont,
+      namedArg "halign" . renderTextHAlign <$> mHAlign,
+      namedArg "valign" . renderTextVAlign <$> mVAlign,
+      namedArg "spacing" . PP.pretty <$> mSpacing,
+      namedArg "direction" . renderTextDirection <$> mDirection,
+      namedArg "language" . PP.dquotes . PP.pretty . map Char.toLower . show <$> mLanguage,
+      namedArg "script" . PP.dquotes . PP.pretty <$> mScript,
+      namedArg "$fn" . PP.pretty <$> mFn
+    ]
+
+renderTextHAlign :: TextHAlign -> PP.Doc ann
+renderTextHAlign =
+  PP.dquotes . \case
+    HLeft -> "left"
+    HCenter -> "center"
+    HRight -> "right"
+
+renderTextVAlign :: TextVAlign -> PP.Doc ann
+renderTextVAlign =
+  PP.dquotes . \case
+    VTop -> "top"
+    VCenter -> "center"
+    VBaseline -> "baseline"
+    VBottom -> "bottom"
+
+renderTextDirection :: TextDirection -> PP.Doc ann
+renderTextDirection =
+  PP.dquotes . \case
+    LeftToRight -> "ltr"
+    RightToLeft -> "rtl"
+    TopToBottom -> "ttb"
+    BottomToTop -> "btt"
 
 renderAction :: PP.Doc ann -> [PP.Doc ann] -> PP.Doc ann
 renderAction name args =
