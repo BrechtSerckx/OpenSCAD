@@ -123,6 +123,9 @@ module Graphics.OpenSCAD
     -- ** Text Config
     TextConfig (..),
     defTextConfig,
+    TextHAlign (..),
+    TextVAlign (..),
+    TextDirection (..),
 
     -- * Primitive creation
 
@@ -191,9 +194,11 @@ module Graphics.OpenSCAD
   )
 where
 
+import qualified Data.Char as Char
 import Data.Colour (AlphaColour, Colour, alphaChannel, darken, over)
 import Data.Colour.Names as Colours
 import Data.Colour.SRGB (channelBlue, channelGreen, channelRed, toSRGB)
+import Data.LanguageCodes (ISO639_1)
 import Data.List (elemIndices, intercalate, nub)
 import Data.Maybe (catMaybes)
 import qualified Data.Set as Set
@@ -294,15 +299,24 @@ data Shape
 -- | The third argument to unsafePolyhedron is a 'Sides'.
 data Sides = Faces [[Int]] | Triangles [[Int]] deriving (Show)
 
+data TextHAlign = HLeft | HCenter | HRight
+  deriving (Eq, Show)
+
+data TextVAlign = VTop | VCenter | VBaseline | VBottom
+  deriving (Eq, Show)
+
+data TextDirection = LeftToRight | RightToLeft | TopToBottom | BottomToTop
+  deriving (Eq, Show)
+
 -- | Text configuration
 data TextConfig = TextConfig
   { textSize :: Maybe Double,
     textFont :: Maybe String,
-    textHAlign :: Maybe String,
-    textVAlign :: Maybe String,
+    textHAlign :: Maybe TextHAlign,
+    textVAlign :: Maybe TextVAlign,
     textSpacing :: Maybe Double,
-    textDirection :: Maybe String,
-    textLanguage :: Maybe String,
+    textDirection :: Maybe TextDirection,
+    textLanguage :: Maybe ISO639_1,
     textScript :: Maybe String,
     textFn :: Maybe Int
   }
@@ -693,14 +707,37 @@ renderTextConfig (TextConfig mSize mFont mHAlign mVAlign mSpacing mDirection mLa
   catMaybes
     [ namedArg "size" . show <$> mSize,
       namedArg "font" . show <$> mFont,
-      namedArg "halign" . show <$> mHAlign,
-      namedArg "valign" . show <$> mVAlign,
+      namedArg "halign" . renderTextHAlign <$> mHAlign,
+      namedArg "valign" . renderTextVAlign <$> mVAlign,
       namedArg "spacing" . show <$> mSpacing,
-      namedArg "direction" . show <$> mDirection,
-      namedArg "language" . show <$> mLanguage,
+      namedArg "direction" . renderTextDirection <$> mDirection,
+      namedArg "language" . show . map Char.toLower . show <$> mLanguage,
       namedArg "script" . show <$> mScript,
       namedArg "$fn" . show <$> mFn
     ]
+
+renderTextHAlign :: TextHAlign -> String
+renderTextHAlign =
+  show . \case
+    HLeft -> "left"
+    HCenter -> "center"
+    HRight -> "right"
+
+renderTextVAlign :: TextVAlign -> String
+renderTextVAlign =
+  show . \case
+    VTop -> "top"
+    VCenter -> "center"
+    VBaseline -> "baseline"
+    VBottom -> "bottom"
+
+renderTextDirection :: TextDirection -> String
+renderTextDirection =
+  show . \case
+    LeftToRight -> "ltr"
+    RightToLeft -> "rtl"
+    TopToBottom -> "ttb"
+    BottomToTop -> "btt"
 
 -- utility for rendering Joins
 renderJoin :: Join -> String
