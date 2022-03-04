@@ -144,7 +144,6 @@ module Graphics.OpenSCAD
     linearExtrude,
     rotateExtrude,
     surface,
-    solid,
 
     -- * Functions
 
@@ -298,7 +297,6 @@ data Solid
   | LinearExtrude Double Double Vector2d Int Int Facets Model2d
   | RotateExtrude Int Facets Model2d
   | Surface FilePath Bool Int
-  | ToSolid Model2d
   deriving (Show)
 
 -- | A 'Model' is either a 'Model2d', a 'Model3d', a transformation of
@@ -467,10 +465,6 @@ unsafePolyhedron convexity points sides = Solid $ Polyhedron convexity points si
 -- | Transform a 'Model3d' with a 'TransMatrix'
 multMatrix :: TransMatrix -> Model3d -> Model3d
 multMatrix t m = Solid $ MultMatrix t m
-
--- | Turn a 'Model2d' into a 'Model3d' exactly as is.
-solid :: Model2d -> Model3d
-solid = Solid . ToSolid
 
 -- | Extrude a 'Model2d' along a line with @linear_extrude@.
 linearExtrude ::
@@ -699,7 +693,6 @@ renderSolid = \case
         namedArg "invert" $ renderBool i,
         namedArg "convexity" $ show c
       ]
-  ToSolid s -> render s
 
 -- render a Sides.
 renderSidesArgs :: Sides -> String

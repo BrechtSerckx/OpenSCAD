@@ -79,7 +79,7 @@ tests =
             ],
           testGroup
             "Misc"
-            [ st "import" "import(\"test.stl\");" (solid $ importFile "test.stl"),
+            [ st "import" "import(\"test.stl\");" (importFile "test.stl" :: Model3d),
               st
                 "polyhedron 1"
                 "polyhedron(points=[[10.0,10.0,0.0],[10.0,-10.0,0.0],[0.0,0.0,10.0],[-10.0,-10.0,0.0],[-10.0,10.0,0.0]],triangles=[[0,1,2],[1,3,2],[3,4,2],[4,0,2],[1,0,4],[3,1,4]],convexity=1);"
@@ -205,7 +205,7 @@ tests =
             ],
           testGroup
             "Misc"
-            [ st "import" "import(\"test.dxf\");" (solid $ importFile "test.dxf"),
+            [ st "import" "import(\"test.dxf\");" (importFile "test.dxf" :: Model3d),
               st
                 "polygon"
                 "polygon(points=[[0.0,0.0],[100.0,0.0],[0.0,100.0],[10.0,10.0],[80.0,10.0],[10.0,80.0]],paths=[[0,1,2],[3,4,5]],convexity=10);"
@@ -440,7 +440,7 @@ tests =
             (mconcat [square 1, circle 1.1 $ fs 0.1]),
           st "Monoid 3 3d" "sphere(1.1,$fs=0.1);" (mconcat [sphere 1.1 $ fs 0.1]),
           st "Monoid 3 2d" "square([1.0,1.0]);" (mconcat [square 1]),
-          st "Monoid 4 3d" "square([0.0,0.0]);" (solid mempty),
+          st "Monoid 4 3d" "cube([0.0,0.0,0.0]);" (mempty :: Model3d),
           st "Monoid 4 2d" "square([0.0,0.0]);" (mempty :: Model2d),
           st
             "Monoid 5 3d"
