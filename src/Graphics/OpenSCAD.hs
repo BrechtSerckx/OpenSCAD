@@ -120,6 +120,10 @@ module Graphics.OpenSCAD
     -- ** Type for 'unsafePolyhedron' 'Sides' argument
     Sides (..),
 
+    -- ** Text Config
+    TextConfig (..),
+    defTextConfig,
+
     -- * Primitive creation
 
     -- ** 'Model2d's
@@ -129,6 +133,7 @@ module Graphics.OpenSCAD
     polygon,
     unsafePolygon,
     projection,
+    text,
     offset,
     importFile,
 
@@ -283,10 +288,39 @@ data Shape
   | Circle Double Facets
   | Polygon Int [Vector2d] [[Int]]
   | Projection Bool Model3d
+  | Text String TextConfig
   deriving (Show)
 
 -- | The third argument to unsafePolyhedron is a 'Sides'.
 data Sides = Faces [[Int]] | Triangles [[Int]] deriving (Show)
+
+-- | Text configuration
+data TextConfig = TextConfig
+  { textSize :: Maybe Double,
+    textFont :: Maybe String,
+    textHAlign :: Maybe String,
+    textVAlign :: Maybe String,
+    textSpacing :: Maybe Double,
+    textDirection :: Maybe String,
+    textLanguage :: Maybe String,
+    textScript :: Maybe String,
+    textFn :: Maybe Int
+  }
+  deriving (Eq, Show)
+
+defTextConfig :: TextConfig
+defTextConfig =
+  TextConfig
+    { textSize = Nothing,
+      textFont = Nothing,
+      textHAlign = Nothing,
+      textVAlign = Nothing,
+      textSpacing = Nothing,
+      textDirection = Nothing,
+      textLanguage = Nothing,
+      textScript = Nothing,
+      textFn = Nothing
+    }
 
 -- A 'Solid' is a 3-dimensional primitive to be used in a 'Model3d'.
 data Solid
@@ -357,6 +391,10 @@ circle r facets = Shape $ Circle r facets
 -- | Project a 'Model3d' into a 'Model' with @projection /cut 'Model3d'/@.
 projection :: Bool -> Model3d -> Model2d
 projection c s = Shape $ Projection c s
+
+text :: String -> TextConfig -> Model2d
+text t c =
+  Shape $ Text t c
 
 -- | Turn a list of lists of 'Vector2d's and an Int into @polygon
 -- /convexity points path/@. The argument to polygon is the list of
@@ -623,6 +661,9 @@ renderShape = \case
         namedArg "paths" $ show paths,
         namedArg "convexity" $ show c
       ]
+  Text t c ->
+    renderAction "text" $
+      namedArg "text" (show t) : renderTextConfig c
 
 renderAction :: String -> [String] -> String
 renderAction name args = name ++ renderArgs args ++ ";\n"
@@ -645,6 +686,21 @@ namedArg name val = name ++ "=" ++ val
 
 renderList :: [String] -> String
 renderList l = "[" ++ intercalate "," l ++ "]"
+
+-- | Render `TextConfig` as args
+renderTextConfig :: TextConfig -> [String]
+renderTextConfig (TextConfig mSize mFont mHAlign mVAlign mSpacing mDirection mLanguage mScript mFn) =
+  catMaybes
+    [ namedArg "size" . show <$> mSize,
+      namedArg "font" . show <$> mFont,
+      namedArg "halign" . show <$> mHAlign,
+      namedArg "valign" . show <$> mVAlign,
+      namedArg "spacing" . show <$> mSpacing,
+      namedArg "direction" . show <$> mDirection,
+      namedArg "language" . show <$> mLanguage,
+      namedArg "script" . show <$> mScript,
+      namedArg "$fn" . show <$> mFn
+    ]
 
 -- utility for rendering Joins
 renderJoin :: Join -> String
