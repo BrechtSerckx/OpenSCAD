@@ -595,28 +595,49 @@ render :: Vector v => Model v -> String
 render = show . PP.pretty
 
 instance Vector v => PP.Pretty (Model v) where
-  pretty = \case
-    Shape s -> PP.pretty s
-    Solid s -> PP.pretty s
-    UnaryOp op m -> PP.pretty op <+> renderSubModels [m]
-    BinaryOp op m1 m2 -> PP.pretty op <+> renderSubModels [m1, m2]
-    ListOp op ms -> PP.pretty op <+> PP.braces (PP.cat $ PP.pretty <$> ms)
-    Projection c m -> renderOperator "projection" [namedArg "cut" $ renderBool c] <+> renderSubModels [m]
-    LinearExtrude h t sc sl c f m ->
-      renderOperator
-        "linear_extrude"
-        ( [ namedArg "height" $ PP.pretty h,
-            namedArg "twist" $ PP.pretty t,
-            namedArg "scale" $ PP.pretty $ rVector sc, -- FIXME
-            namedArg "slices" $ PP.pretty sl,
-            namedArg "convexity" $ PP.pretty c
-          ]
-            ++ facetsToArgs f
-        )
-        <+> renderSubModels [m]
-    RotateExtrude c f m -> renderOperator "rotate_extrude" (namedArg "convexity" (PP.pretty c) : facetsToArgs f) <+> renderSubModels [m]
-    Import f -> renderAction "import" [PP.pretty $ "\"" ++ f ++ "\""]
-    Var facets ss -> renderOperator "let" (facetsToArgs facets) <+> renderSubModels ss
+  pretty =
+    PP.group . \case
+      Shape s -> PP.pretty s
+      Solid s -> PP.pretty s
+      UnaryOp op m -> renderTransform (PP.pretty op) [m]
+      BinaryOp op m1 m2 -> renderTransform (PP.pretty op) [m1, m2]
+      ListOp op ms -> renderTransform (PP.pretty op) ms
+      Projection c m -> renderTransform (renderOperator "projection" [namedArg "cut" $ renderBool c]) [m]
+      LinearExtrude h t sc sl c f m ->
+        renderTransform
+          ( renderOperator
+              "linear_extrude"
+              $ [ namedArg "height" $ PP.pretty h,
+                  namedArg "twist" $ PP.pretty t,
+                  namedArg "scale" $ PP.pretty $ rVector sc, -- FIXME
+                  namedArg "slices" $ PP.pretty sl,
+                  namedArg "convexity" $ PP.pretty c
+                ]
+                ++ facetsToArgs f
+          )
+          [m]
+      RotateExtrude c f m ->
+        renderTransform
+          ( renderOperator "rotate_extrude" $
+              namedArg "convexity" (PP.pretty c) : facetsToArgs f
+          )
+          [m]
+      Import f -> renderAction "import" [PP.pretty $ "\"" ++ f ++ "\""]
+      Var facets ss ->
+        renderTransform
+          (renderOperator "let" $ facetsToArgs facets)
+          ss
+    where
+      renderTransform op ms = op <+> renderSubModels ms
+      renderSubModels :: Vector v => [Model v] -> PP.Doc ann
+      renderSubModels = \case
+        [m] -> PP.nest 2 $ PP.line' <> PP.pretty m
+        ms ->
+          PP.braces
+            . PP.enclose PP.line' PP.line'
+            . PP.indent 2
+            . PP.vsep
+            $ PP.pretty <$> ms
 
 instance Vector v => PP.Pretty (UnaryOp v) where
   pretty = \case
@@ -633,7 +654,9 @@ instance Vector v => PP.Pretty (UnaryOp v) where
             [PP.align . PP.list $ PP.list . fmap PP.pretty . q2list <$> [a, b, c, d]]
     Color c ->
       let r = toSRGB c
-       in renderOperator "color" [PP.pretty $ rVector (channelRed r, channelGreen r, channelBlue r)]
+       in renderOperator
+            "color"
+            [PP.pretty $ rVector (channelRed r, channelGreen r, channelBlue r)]
     Transparent c ->
       renderOperator
         "color"
@@ -675,17 +698,13 @@ instance PP.Pretty Shape where
 
 renderAction :: PP.Doc ann -> [PP.Doc ann] -> PP.Doc ann
 renderAction name args =
-  name
-    <> PP.align (PP.tupled args)
-    <> PP.semi
+  PP.group $
+    name
+      <> PP.tupled args
+      <> PP.semi
 
 renderOperator :: PP.Doc ann -> [PP.Doc ann] -> PP.Doc ann
-renderOperator name args = name <> PP.align (PP.tupled args)
-
-renderSubModels :: Vector v => [Model v] -> PP.Doc ann
-renderSubModels = \case
-  [m] -> PP.pretty m
-  ms -> PP.braces . PP.cat $ PP.pretty <$> ms
+renderOperator name args = PP.group $ name <> PP.align (PP.tupled args)
 
 renderBool :: Bool -> PP.Doc ann
 renderBool b = if b then "true" else "false"
