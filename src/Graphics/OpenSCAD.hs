@@ -293,9 +293,6 @@ data Solid
   | Cylinder Double Double Facets
   | ObCylinder Double Double Double Facets
   | Polyhedron Int [Vector3d] Sides
-  | MultMatrix TransMatrix Model3d
-  | LinearExtrude Double Double Vector2d Int Int Facets Model2d
-  | RotateExtrude Int Facets Model2d
   | Surface FilePath Bool Int
   deriving (Show)
 
@@ -321,6 +318,9 @@ data Model v where
   Minkowski :: [Model v] -> Model v
   Hull :: [Model v] -> Model v
   Difference :: Model v -> Model v -> Model v
+  MultMatrix :: TransMatrix -> Model3d -> Model3d
+  LinearExtrude :: Double -> Double -> Vector2d -> Int -> Int -> Facets -> Model2d -> Model3d
+  RotateExtrude :: Int -> Facets -> Model2d -> Model3d
   -- And oddball stuff control
   Import :: FilePath -> Model v
   Var :: Facets -> [Model v] -> Model v
@@ -464,7 +464,7 @@ unsafePolyhedron convexity points sides = Solid $ Polyhedron convexity points si
 
 -- | Transform a 'Model3d' with a 'TransMatrix'
 multMatrix :: TransMatrix -> Model3d -> Model3d
-multMatrix t m = Solid $ MultMatrix t m
+multMatrix = MultMatrix
 
 -- | Extrude a 'Model2d' along a line with @linear_extrude@.
 linearExtrude ::
@@ -482,12 +482,12 @@ linearExtrude ::
   -- | to extrude
   Model2d ->
   Model3d
-linearExtrude h t sc sl c f m = Solid $ LinearExtrude h t sc sl c f m
+linearExtrude = LinearExtrude
 
 -- | Rotate a 'Model2d' around the origin with @rotate_extrude
 -- /convexity 'Facet' 'Model'/@
 rotateExtrude :: Int -> Facets -> Model2d -> Model3d
-rotateExtrude c f m = Solid $ RotateExtrude c f m
+rotateExtrude = RotateExtrude
 
 -- | Load a height map from a file with @surface /FilePath Invert Convexity/@.
 surface :: FilePath -> Bool -> Int -> Model3d
@@ -583,6 +583,25 @@ render = \case
   Projection c s ->
     renderOperator "projection" [namedArg "cut" $ renderBool c] [s]
   Mirror v s -> renderOperator "mirror" [rVector v] [s]
+  MultMatrix (a, b, c, d) s ->
+    renderOperator
+      "multmatrix"
+      [renderList $ renderQuad <$> [a, b, c, d]]
+      [s]
+  LinearExtrude h t sc sl c f sh ->
+    renderOperator
+      "linear_extrude"
+      ( [ namedArg "height" $ show h,
+          namedArg "twist" $ show t,
+          namedArg "scale" $ rVector sc,
+          namedArg "slices" $ show sl,
+          namedArg "convexity" $ show c
+        ]
+          ++ renderFacets f
+      )
+      [sh]
+  RotateExtrude c f sh ->
+    renderOperator "rotate_extrude" (namedArg "convexity" (show c) : renderFacets f) [sh]
   Import f -> renderAction "import" ["\"" ++ f ++ "\""]
   Color c s ->
     let r = toSRGB c
@@ -667,25 +686,6 @@ renderSolid = \case
         renderSidesArgs ss,
         namedArg "convexity" $ show c
       ]
-  MultMatrix (a, b, c, d) s ->
-    renderOperator
-      "multmatrix"
-      [renderList $ renderQuad <$> [a, b, c, d]]
-      [s]
-  LinearExtrude h t sc sl c f sh ->
-    renderOperator
-      "linear_extrude"
-      ( [ namedArg "height" $ show h,
-          namedArg "twist" $ show t,
-          namedArg "scale" $ rVector sc,
-          namedArg "slices" $ show sl,
-          namedArg "convexity" $ show c
-        ]
-          ++ renderFacets f
-      )
-      [sh]
-  RotateExtrude c f sh ->
-    renderOperator "rotate_extrude" (namedArg "convexity" (show c) : renderFacets f) [sh]
   Surface f i c ->
     renderAction
       "surface"
