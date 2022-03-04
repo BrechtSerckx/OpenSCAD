@@ -282,7 +282,6 @@ data Shape
   = Rectangle Double Double
   | Circle Double Facets
   | Polygon Int [Vector2d] [[Int]]
-  | Projection Bool Model3d
   deriving (Show)
 
 -- | The third argument to unsafePolyhedron is a 'Sides'.
@@ -317,6 +316,7 @@ data Model v where
   Color :: Colour Double -> Model v -> Model v
   Transparent :: AlphaColour Double -> Model v -> Model v
   Offset :: Double -> Join -> Model2d -> Model2d
+  Projection :: Bool -> Model3d -> Model2d
   -- and combinations -> Model v
   Union :: [Model v] -> Model v
   Intersection :: [Model v] -> Model v
@@ -356,7 +356,7 @@ circle r facets = Shape $ Circle r facets
 
 -- | Project a 'Model3d' into a 'Model' with @projection /cut 'Model3d'/@.
 projection :: Bool -> Model3d -> Model2d
-projection c s = Shape $ Projection c s
+projection = Projection
 
 -- | Turn a list of lists of 'Vector2d's and an Int into @polygon
 -- /convexity points path/@. The argument to polygon is the list of
@@ -586,6 +586,8 @@ render = \case
   Translate v s -> renderOperator "translate" [rVector v] [s]
   Rotate2d v s -> renderOperator "rotate" [rVector ((0, 0, v) :: Vector3d)] [s]
   Rotate3d v s -> renderOperator "rotate" [rVector v] [s]
+  Projection c s ->
+    renderOperator "projection" [namedArg "cut" $ renderBool c] [s]
   Mirror v s -> renderOperator "mirror" [rVector v] [s]
   Import f -> renderAction "import" ["\"" ++ f ++ "\""]
   Color c s ->
@@ -614,8 +616,6 @@ renderShape = \case
     renderAction "square" [renderList [show r, show f]]
   Circle r facets ->
     renderAction "circle" $ show r : renderFacets facets
-  Projection c s ->
-    renderOperator "projection" [namedArg "cut" $ renderBool c] [s]
   Polygon c points paths ->
     renderAction
       "polygon"
