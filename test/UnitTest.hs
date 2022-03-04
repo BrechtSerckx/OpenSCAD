@@ -5,6 +5,7 @@ module Main where
 import Control.DeepSeq
 import Control.Exception
 import Data.Colour (withOpacity)
+import Data.LanguageCodes (ISO639_1 (..))
 import Graphics.OpenSCAD
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -202,6 +203,25 @@ tests =
               st "2" "circle(2.0,$fn=100);" (circle 2 $ fn 100),
               st "3" "circle(2.0,$fa=5.0);" (circle 2 $ fa 5),
               st "4" "circle(2.0,$fs=0.1);" (circle 2 $ fs 0.1)
+            ],
+          testGroup
+            "Text"
+            [ st "1" "text(text=\"foo\");" $ text "foo" defTextConfig,
+              st "2" "text(text=\"bar\",size=14.0,font=\"Fira Code\",halign=\"right\",valign=\"top\",spacing=2.0,direction=\"ttb\",language=\"fr\",script=\"foobar\",$fn=5);" $
+                text
+                  "bar"
+                  ( TextConfig
+                      { textSize = Just 14,
+                        textFont = Just "Fira Code",
+                        textHAlign = Just HRight,
+                        textVAlign = Just VTop,
+                        textSpacing = Just 2,
+                        textDirection = Just TopToBottom,
+                        textLanguage = Just FR,
+                        textScript = Just "foobar",
+                        textFn = Just 5
+                      }
+                  )
             ],
           testGroup
             "Misc"
