@@ -152,7 +152,6 @@ module Graphics.OpenSCAD
     linearExtrude,
     rotateExtrude,
     surface,
-    solid,
 
     -- * Functions
 
@@ -287,12 +286,11 @@ data Facets = Facets
 -- 'offset' operation.
 data Join = Bevel | Round | Miter Double deriving (Show)
 
--- A 'Shape' is a 2-dimensional primitive to be used in a 'Model2d'.
+-- | A 'Shape' is a 2-dimensional primitive to be used in a 'Model2d'.
 data Shape
   = Rectangle Double Double
   | Circle Double Facets
   | Polygon Int [Vector2d] [[Int]]
-  | Projection Bool Model3d
   | Text String TextConfig
   deriving (Show)
 
@@ -336,19 +334,50 @@ defTextConfig =
       textFn = Nothing
     }
 
--- A 'Solid' is a 3-dimensional primitive to be used in a 'Model3d'.
+-- | A 'Solid' is a 3-dimensional primitive to be used in a 'Model3d'.
 data Solid
   = Sphere Double Facets
   | Box Double Double Double
   | Cylinder Double Double Facets
   | ObCylinder Double Double Double Facets
   | Polyhedron Int [Vector3d] Sides
-  | MultMatrix TransMatrix Model3d
-  | LinearExtrude Double Double Vector2d Int Int Facets Model2d
-  | RotateExtrude Int Facets Model2d
   | Surface FilePath Bool Int
-  | ToSolid Model2d
   deriving (Show)
+
+-- | A 'Transformation' is an OpenSCAD operator that changes an existing model
+-- into another model
+data UnaryOp v where
+  Scale :: v -> UnaryOp v
+  Resize :: v -> UnaryOp v
+  Rotate2d :: Double -> UnaryOp Vector2d
+  Rotate3d :: Vector3d -> UnaryOp Vector3d
+  Translate :: v -> UnaryOp v
+  Mirror :: v -> UnaryOp v
+  Color :: Colour Double -> UnaryOp v
+  Transparent :: AlphaColour Double -> UnaryOp v
+  Offset :: Double -> Join -> UnaryOp Vector2d
+  MultMatrix :: TransMatrix -> UnaryOp Vector3d
+
+deriving instance Show (UnaryOp Vector2d)
+
+deriving instance Show (UnaryOp Vector3d)
+
+data BinaryOp v where
+  Difference :: BinaryOp v
+
+deriving instance Show (BinaryOp Vector2d)
+
+deriving instance Show (BinaryOp Vector3d)
+
+data ListOp v where
+  Union :: ListOp v
+  Intersection :: ListOp v
+  Minkowski :: ListOp v
+  Hull :: ListOp v
+
+deriving instance Show (ListOp Vector2d)
+
+deriving instance Show (ListOp Vector3d)
 
 -- | A 'Model' is either a 'Model2d', a 'Model3d', a transformation of
 -- a 'Model', a combination of 'Model's, or a 'Model' with it's
@@ -356,21 +385,12 @@ data Solid
 data Model v where
   Shape :: Shape -> Model2d
   Solid :: Solid -> Model3d
-  Scale :: v -> Model v -> Model v
-  Resize :: v -> Model v -> Model v
-  Rotate2d :: Double -> Model2d -> Model2d
-  Rotate3d :: Vector3d -> Model3d -> Model3d
-  Translate :: v -> Model v -> Model v
-  Mirror :: v -> Model v -> Model v
-  Color :: Colour Double -> Model v -> Model v
-  Transparent :: AlphaColour Double -> Model v -> Model v
-  Offset :: Double -> Join -> Model2d -> Model2d
-  -- and combinations -> Model v
-  Union :: [Model v] -> Model v
-  Intersection :: [Model v] -> Model v
-  Minkowski :: [Model v] -> Model v
-  Hull :: [Model v] -> Model v
-  Difference :: Model v -> Model v -> Model v
+  UnaryOp :: UnaryOp v -> Model v -> Model v
+  BinaryOp :: BinaryOp v -> Model v -> Model v -> Model v
+  ListOp :: ListOp v -> [Model v] -> Model v
+  Projection :: Bool -> Model3d -> Model2d
+  LinearExtrude :: Double -> Double -> Vector2d -> Int -> Int -> Facets -> Model2d -> Model3d
+  RotateExtrude :: Int -> Facets -> Model2d -> Model3d
   -- And oddball stuff control
   Import :: FilePath -> Model v
   Var :: Facets -> [Model v] -> Model v
@@ -404,7 +424,7 @@ circle r facets = Shape $ Circle r facets
 
 -- | Project a 'Model3d' into a 'Model' with @projection /cut 'Model3d'/@.
 projection :: Bool -> Model3d -> Model2d
-projection c s = Shape $ Projection c s
+projection = Projection
 
 text :: String -> TextConfig -> Model2d
 text t c =
@@ -435,7 +455,7 @@ unsafePolygon convexity points paths = Shape $ Polygon convexity points paths
 
 -- | 'offset' a 'Model2d's edges by @offset /delta join/@.
 offset :: Double -> Join -> Model2d -> Model2d
-offset = Offset
+offset d j = UnaryOp (Offset d j)
 
 -- Tools for creating Model3ds
 
@@ -518,11 +538,7 @@ unsafePolyhedron convexity points sides = Solid $ Polyhedron convexity points si
 
 -- | Transform a 'Model3d' with a 'TransMatrix'
 multMatrix :: TransMatrix -> Model3d -> Model3d
-multMatrix t m = Solid $ MultMatrix t m
-
--- | Turn a 'Model2d' into a 'Model3d' exactly as is.
-solid :: Model2d -> Model3d
-solid = Solid . ToSolid
+multMatrix m = UnaryOp (MultMatrix m)
 
 -- | Extrude a 'Model2d' along a line with @linear_extrude@.
 linearExtrude ::
@@ -540,12 +556,12 @@ linearExtrude ::
   -- | to extrude
   Model2d ->
   Model3d
-linearExtrude h t sc sl c f m = Solid $ LinearExtrude h t sc sl c f m
+linearExtrude = LinearExtrude
 
 -- | Rotate a 'Model2d' around the origin with @rotate_extrude
 -- /convexity 'Facet' 'Model'/@
 rotateExtrude :: Int -> Facets -> Model2d -> Model3d
-rotateExtrude c f m = Solid $ RotateExtrude c f m
+rotateExtrude = RotateExtrude
 
 -- | Load a height map from a file with @surface /FilePath Invert Convexity/@.
 surface :: FilePath -> Bool -> Int -> Model3d
@@ -561,40 +577,40 @@ importFile = Import
 
 -- | Scale a 'Model', the vector specifying the scale factor for each axis.
 scale :: Vector v => v -> Model v -> Model v
-scale = Scale
+scale v = UnaryOp (Scale v)
 
 -- | Resize a 'Model' to occupy the dimensions given by the vector. Note that
 -- this does nothing prior to the 2014 versions of OpenSCAD.
 resize :: Vector v => v -> Model v -> Model v
-resize = Resize
+resize v = UnaryOp (Resize v)
 
 -- | Rotate a 'Model' around the z-axis
 rotate2d :: Double -> Model2d -> Model2d
-rotate2d = Rotate2d
+rotate2d th = UnaryOp (Rotate2d th)
 
 -- | Rotate a 'Model' by different amounts around each of the three axis.
 rotate3d :: Vector3d -> Model3d -> Model3d
-rotate3d = Rotate3d
+rotate3d v = UnaryOp (Rotate3d v)
 
 -- | Translate a 'Model' along a 'Vector'.
 translate :: Vector v => v -> Model v -> Model v
-translate = Translate
+translate v = UnaryOp (Translate v)
 
 -- | Mirror a 'Model' across a plane intersecting the origin.
 mirror :: Vector v => v -> Model v -> Model v
-mirror = Mirror
+mirror v = UnaryOp (Mirror v)
 
 -- | Render a 'Model' in a specific color. This doesn't use the
 -- OpenSCAD color model, but instead uses the 'Data.Colour' model. The
 -- 'Graphics.OpenSCAD' module rexports 'Data.Colour.Names' so you can
 -- conveniently say @'color' 'red' /'Model'/@.
 color :: Vector v => Colour Double -> Model v -> Model v
-color = Color
+color c = UnaryOp (Color c)
 
 -- | Render a 'Model' in a transparent color. This uses the
 -- 'Data.Colour.AlphaColour' color model.
 transparent :: Vector v => AlphaColour Double -> Model v -> Model v
-transparent = Transparent
+transparent ac = UnaryOp (Transparent ac)
 
 -- | A 'translate' that just goes up, since those seem to be common.
 up :: Double -> Model3d -> Model3d
@@ -604,23 +620,23 @@ up f = translate (0, 0, f)
 
 -- | Create the union of a list of 'Model's.
 union :: Vector v => [Model v] -> Model v
-union = Union
+union = ListOp Union
 
 -- | Create the intersection of a list of 'Model's.
 intersection :: Vector v => [Model v] -> Model v
-intersection = Intersection
+intersection = ListOp Intersection
 
 -- | The difference between two 'Model's.
 difference :: Vector v => Model v -> Model v -> Model v
-difference = Difference
+difference = BinaryOp Difference
 
 -- | The Minkowski sum of a list of 'Model's.
 minkowski :: Vector v => [Model v] -> Model v
-minkowski = Minkowski
+minkowski = ListOp Minkowski
 
 -- | The convex hull of a list of 'Model's.
 hull :: Vector v => [Model v] -> Model v
-hull = Hull
+hull = ListOp Hull
 
 -- | 'render' does all the real work. It will walk the AST for a 'Model',
 -- returning an OpenSCAD program in a 'String'.
@@ -628,36 +644,65 @@ render :: Vector v => Model v -> String
 render = \case
   Shape s -> renderShape s
   Solid s -> renderSolid s
-  Union ss -> renderOperator "union" [] ss
-  Intersection ss -> renderOperator "intersection" [] ss
-  Difference s1 s2 -> renderOperator "difference" [] [s1, s2]
-  Minkowski ss -> renderOperator "minkowski" [] ss
-  Hull ss -> renderOperator "hull" [] ss
-  Scale v s -> renderOperator "scale" [rVector v] [s]
-  Resize v s -> renderOperator "resize" [rVector v] [s]
-  Translate v s -> renderOperator "translate" [rVector v] [s]
-  Rotate2d v s -> renderOperator "rotate" [rVector ((0, 0, v) :: Vector3d)] [s]
-  Rotate3d v s -> renderOperator "rotate" [rVector v] [s]
-  Mirror v s -> renderOperator "mirror" [rVector v] [s]
-  Import f -> renderAction "import" ["\"" ++ f ++ "\""]
-  Color c s ->
-    let r = toSRGB c
-     in renderOperator
-          "color"
-          [rVector (channelRed r, channelGreen r, channelBlue r)]
-          [s]
-  Transparent c s ->
+  UnaryOp op m -> renderUnaryOp op m
+  BinaryOp op m1 m2 -> renderBinaryOp op m1 m2
+  ListOp op ms -> renderListOp op ms
+  Projection c m -> renderOperator "projection" [namedArg "cut" $ renderBool c] [m]
+  LinearExtrude h t sc sl c f m ->
     renderOperator
+      "linear_extrude"
+      ( [ namedArg "height" $ show h,
+          namedArg "twist" $ show t,
+          namedArg "scale" $ rVector sc,
+          namedArg "slices" $ show sl,
+          namedArg "convexity" $ show c
+        ]
+          ++ renderFacets f
+      )
+      [m]
+  RotateExtrude c f m -> renderOperator "rotate_extrude" (namedArg "convexity" (show c) : renderFacets f) [m]
+  Import f -> renderAction "import" ["\"" ++ f ++ "\""]
+  Var facets ss -> renderOperator "let" (renderFacets facets) ss
+
+renderUnaryOp :: Vector v1 => UnaryOp v1 -> Model v1 -> String
+renderUnaryOp = \case
+  Scale v -> renderOp "scale" [rVector v]
+  Resize v -> renderOp "resize" [rVector v]
+  Translate v -> renderOp "translate" [rVector v]
+  Rotate2d v -> renderOp "rotate" [rVector ((0, 0, v) :: Vector3d)]
+  Rotate3d v -> renderOp "rotate" [rVector v]
+  Mirror v -> renderOp "mirror" [rVector v]
+  MultMatrix (a, b, c, d) -> renderOp "multmatrix" [renderList $ renderQuad <$> [a, b, c, d]]
+  Color c ->
+    let r = toSRGB c
+     in renderOp "color" [rVector (channelRed r, channelGreen r, channelBlue r)]
+  Transparent c ->
+    renderOp
       "color"
       [renderList $ show <$> [channelRed r, channelGreen r, channelBlue r, a]]
-      [s]
     where
       r = toSRGB $ toPure c
       a = alphaChannel c
       toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
-  Offset d j m ->
-    renderOperator "offset" [namedArg "delta" $ show d, renderJoin j] [m]
-  Var facets ss -> renderOperator "let" (renderFacets facets) ss
+  Offset d j ->
+    renderOp "offset" [namedArg "delta" $ show d, renderJoin j]
+  where
+    renderOp name args m = renderOperator name args [m]
+
+renderBinaryOp :: Vector v => BinaryOp v -> Model v -> Model v -> String
+renderBinaryOp = \case
+  Difference -> renderOp "difference" []
+  where
+    renderOp name args m1 m2 = renderOperator name args [m1, m2]
+
+renderListOp :: Vector v => ListOp v -> [Model v] -> String
+renderListOp = \case
+  Union -> renderOp "union" []
+  Intersection -> renderOp "intersection" []
+  Minkowski -> renderOp "minkowski" []
+  Hull -> renderOp "hull" []
+  where
+    renderOp name args ms = renderOperator name args ms
 
 -- utility for rendering Shapes.
 renderShape :: Shape -> String
@@ -666,8 +711,6 @@ renderShape = \case
     renderAction "square" [renderList [show r, show f]]
   Circle r facets ->
     renderAction "circle" $ show r : renderFacets facets
-  Projection c s ->
-    renderOperator "projection" [namedArg "cut" $ renderBool c] [s]
   Polygon c points paths ->
     renderAction
       "polygon"
@@ -766,25 +809,6 @@ renderSolid = \case
         renderSidesArgs ss,
         namedArg "convexity" $ show c
       ]
-  MultMatrix (a, b, c, d) s ->
-    renderOperator
-      "multmatrix"
-      [renderList $ renderQuad <$> [a, b, c, d]]
-      [s]
-  LinearExtrude h t sc sl c f sh ->
-    renderOperator
-      "linear_extrude"
-      ( [ namedArg "height" $ show h,
-          namedArg "twist" $ show t,
-          namedArg "scale" $ rVector sc,
-          namedArg "slices" $ show sl,
-          namedArg "convexity" $ show c
-        ]
-          ++ renderFacets f
-      )
-      [sh]
-  RotateExtrude c f sh ->
-    renderOperator "rotate_extrude" (namedArg "convexity" (show c) : renderFacets f) [sh]
   Surface f i c ->
     renderAction
       "surface"
@@ -792,7 +816,6 @@ renderSolid = \case
         namedArg "invert" $ renderBool i,
         namedArg "convexity" $ show c
       ]
-  ToSolid s -> render s
 
 -- render a Sides.
 renderSidesArgs :: Sides -> String
@@ -812,7 +835,7 @@ draw = putStrLn . render
 -- | A convenience function to write a 'union' of 'Model's to
 -- standard output.
 drawL :: Vector v => [Model v] -> IO ()
-drawL = draw . Union
+drawL = draw . ListOp Union
 
 renderQuad :: (Show a, Show b, Show c, Show d) => (a, b, c, d) -> [Char]
 renderQuad (w, x, y, z) =
