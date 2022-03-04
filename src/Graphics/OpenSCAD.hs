@@ -276,7 +276,7 @@ data Facets = Facets
 -- 'offset' operation.
 data Join = Bevel | Round | Miter Double deriving (Show)
 
--- A 'Shape' is a 2-dimensional primitive to be used in a 'Model2d'.
+-- | A 'Shape' is a 2-dimensional primitive to be used in a 'Model2d'.
 data Shape
   = Rectangle Double Double
   | Circle Double Facets
@@ -286,7 +286,7 @@ data Shape
 -- | The third argument to unsafePolyhedron is a 'Sides'.
 data Sides = Faces [[Int]] | Triangles [[Int]] deriving (Show)
 
--- A 'Solid' is a 3-dimensional primitive to be used in a 'Model3d'.
+-- | A 'Solid' is a 3-dimensional primitive to be used in a 'Model3d'.
 data Solid
   = Sphere Double Facets
   | Box Double Double Double
