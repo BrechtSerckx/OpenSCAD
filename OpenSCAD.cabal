@@ -26,7 +26,8 @@ library
                  colour >=2.3 && < 2.4,
                  filepath >=1.3 && < 1.5,
                  semigroups >= 0.15 && < 1.0,
-                 containers >= 0.5
+                 containers >= 0.5,
+                 prettyprinter
   hs-source-dirs:      src
   ghc-options: -Wall
   default-language:    Haskell2010
