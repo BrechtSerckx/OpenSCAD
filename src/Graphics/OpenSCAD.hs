@@ -347,53 +347,33 @@ data Solid
   | Surface FilePath Bool Int
   deriving (Show)
 
--- | A 'Transformation' is an OpenSCAD operator that changes an existing model
--- into another model
-data UnaryOp v where
-  Scale :: v -> UnaryOp v
-  Resize :: v -> UnaryOp v
-  Rotate2d :: Double -> UnaryOp Vector2d
-  Rotate3d :: Vector3d -> UnaryOp Vector3d
-  Translate :: v -> UnaryOp v
-  Mirror :: v -> UnaryOp v
-  Color :: Colour Double -> UnaryOp v
-  Transparent :: AlphaColour Double -> UnaryOp v
-  Offset :: Double -> Join -> UnaryOp Vector2d
-  MultMatrix :: TransMatrix -> UnaryOp Vector3d
-
-deriving instance Show (UnaryOp Vector2d)
-
-deriving instance Show (UnaryOp Vector3d)
-
-data BinaryOp v where
-  Difference :: BinaryOp v
-
-deriving instance Show (BinaryOp Vector2d)
-
-deriving instance Show (BinaryOp Vector3d)
-
-data ListOp v where
-  Union :: ListOp v
-  Intersection :: ListOp v
-  Minkowski :: ListOp v
-  Hull :: ListOp v
-
-deriving instance Show (ListOp Vector2d)
-
-deriving instance Show (ListOp Vector3d)
-
 -- | A 'Model' is either a 'Model2d', a 'Model3d', a transformation of
 -- a 'Model', a combination of 'Model's, or a 'Model' with it's
 -- rendering tweaked by a 'Facet'. 'Model's can be rendered.
 data Model v where
   Shape :: Shape -> Model2d
   Solid :: Solid -> Model3d
-  UnaryOp :: UnaryOp v -> Model v -> Model v
-  BinaryOp :: BinaryOp v -> Model v -> Model v -> Model v
-  ListOp :: ListOp v -> [Model v] -> Model v
+  -- unary ops
   Projection :: Bool -> Model3d -> Model2d
+  Scale :: v -> Model v -> Model v
+  Resize :: v -> Model v -> Model v
+  Rotate2d :: Double -> Model Vector2d -> Model Vector2d
+  Rotate3d :: Vector3d -> Model Vector3d -> Model Vector3d
+  Translate :: v -> Model v -> Model v
+  Mirror :: v -> Model v -> Model v
+  Color :: Colour Double -> Model v -> Model v
+  Transparent :: AlphaColour Double -> Model v -> Model v
+  Offset :: Double -> Join -> Model Vector2d -> Model Vector2d
+  MultMatrix :: TransMatrix -> Model Vector3d -> Model Vector3d
   LinearExtrude :: Double -> Double -> Vector2d -> Int -> Int -> Facets -> Model2d -> Model3d
   RotateExtrude :: Int -> Facets -> Model2d -> Model3d
+  -- binary ops
+  Difference :: Model v -> Model v -> Model v
+  -- list ops
+  Union :: [Model v] -> Model v
+  Intersection :: [Model v] -> Model v
+  Minkowski :: [Model v] -> Model v
+  Hull :: [Model v] -> Model v
   -- And oddball stuff control
   Import :: FilePath -> Model v
   Var :: Facets -> [Model v] -> Model v
@@ -458,7 +438,7 @@ unsafePolygon convexity points paths = Shape $ Polygon convexity points paths
 
 -- | 'offset' a 'Model2d's edges by @offset /delta join/@.
 offset :: Double -> Join -> Model2d -> Model2d
-offset d j = UnaryOp (Offset d j)
+offset = Offset 
 
 -- Tools for creating Model3ds
 
@@ -541,7 +521,7 @@ unsafePolyhedron convexity points sides = Solid $ Polyhedron convexity points si
 
 -- | Transform a 'Model3d' with a 'TransMatrix'
 multMatrix :: TransMatrix -> Model3d -> Model3d
-multMatrix m = UnaryOp (MultMatrix m)
+multMatrix = MultMatrix
 
 -- | Extrude a 'Model2d' along a line with @linear_extrude@.
 linearExtrude ::
@@ -580,40 +560,40 @@ importFile = Import
 
 -- | Scale a 'Model', the vector specifying the scale factor for each axis.
 scale :: Vector v => v -> Model v -> Model v
-scale v = UnaryOp (Scale v)
+scale = Scale 
 
 -- | Resize a 'Model' to occupy the dimensions given by the vector. Note that
 -- this does nothing prior to the 2014 versions of OpenSCAD.
 resize :: Vector v => v -> Model v -> Model v
-resize v = UnaryOp (Resize v)
+resize = Resize 
 
 -- | Rotate a 'Model' around the z-axis
 rotate2d :: Double -> Model2d -> Model2d
-rotate2d th = UnaryOp (Rotate2d th)
+rotate2d = Rotate2d 
 
 -- | Rotate a 'Model' by different amounts around each of the three axis.
 rotate3d :: Vector3d -> Model3d -> Model3d
-rotate3d v = UnaryOp (Rotate3d v)
+rotate3d = Rotate3d 
 
 -- | Translate a 'Model' along a 'Vector'.
 translate :: Vector v => v -> Model v -> Model v
-translate v = UnaryOp (Translate v)
+translate = Translate 
 
 -- | Mirror a 'Model' across a plane intersecting the origin.
 mirror :: Vector v => v -> Model v -> Model v
-mirror v = UnaryOp (Mirror v)
+mirror = Mirror 
 
 -- | Render a 'Model' in a specific color. This doesn't use the
 -- OpenSCAD color model, but instead uses the 'Data.Colour' model. The
 -- 'Graphics.OpenSCAD' module rexports 'Data.Colour.Names' so you can
 -- conveniently say @'color' 'red' /'Model'/@.
 color :: Vector v => Colour Double -> Model v -> Model v
-color c = UnaryOp (Color c)
+color = Color 
 
 -- | Render a 'Model' in a transparent color. This uses the
 -- 'Data.Colour.AlphaColour' color model.
 transparent :: Vector v => AlphaColour Double -> Model v -> Model v
-transparent ac = UnaryOp (Transparent ac)
+transparent = Transparent 
 
 -- | A 'translate' that just goes up, since those seem to be common.
 up :: Double -> Model3d -> Model3d
@@ -623,23 +603,23 @@ up f = translate (0, 0, f)
 
 -- | Create the union of a list of 'Model's.
 union :: Vector v => [Model v] -> Model v
-union = ListOp Union
+union = Union
 
 -- | Create the intersection of a list of 'Model's.
 intersection :: Vector v => [Model v] -> Model v
-intersection = ListOp Intersection
+intersection = Intersection
 
 -- | The difference between two 'Model's.
 difference :: Vector v => Model v -> Model v -> Model v
-difference = BinaryOp Difference
+difference = Difference
 
 -- | The Minkowski sum of a list of 'Model's.
 minkowski :: Vector v => [Model v] -> Model v
-minkowski = ListOp Minkowski
+minkowski = Minkowski
 
 -- | The convex hull of a list of 'Model's.
 hull :: Vector v => [Model v] -> Model v
-hull = ListOp Hull
+hull = Hull
 
 -- | 'render' does all the real work. It will walk the AST for a 'Model',
 -- returning an OpenSCAD program in a 'String'.
@@ -651,9 +631,36 @@ instance Vector v => PP.Pretty (Model v) where
     PP.group . \case
       Shape s -> PP.pretty s
       Solid s -> PP.pretty s
-      UnaryOp op m -> renderTransform (PP.pretty op) [m]
-      BinaryOp op m1 m2 -> renderTransform (PP.pretty op) [m1, m2]
-      ListOp op ms -> renderTransform (PP.pretty op) ms
+      Scale v m -> renderTransform (renderOperator "scale" [PP.pretty $ rVector v]) [m]
+      Resize v m -> renderTransform (renderOperator "resize" [PP.pretty $ rVector v]) [m]
+      Translate v m -> renderTransform (renderOperator "translate" [PP.pretty $ rVector v]) [m]
+      Rotate2d v m -> renderTransform (renderOperator "rotate" [PP.pretty $ rVector ((0, 0, v) :: Vector3d)]) [m]
+      Rotate3d v m -> renderTransform (renderOperator "rotate" [PP.pretty $ rVector v]) [m]
+      Mirror v m -> renderTransform (renderOperator "mirror" [PP.pretty $ rVector v]) [m]
+      MultMatrix (a, b, c, d) m ->
+        let q2list (w, x, y, z) = [w, x, y, z]
+        in renderTransform (renderOperator
+              "multmatrix"
+              [PP.align . PP.list $ PP.list . fmap PP.pretty . q2list <$> [a, b, c, d]]) [m]
+      Color c m ->
+        let r = toSRGB c
+        in renderTransform (renderOperator
+              "color"
+              [PP.pretty $ rVector (channelRed r, channelGreen r, channelBlue r)]) [m]
+      Transparent c m ->
+        renderTransform (renderOperator
+          "color"
+          [PP.list $ PP.pretty <$> [channelRed r, channelGreen r, channelBlue r, a]]) [m]
+        where
+          r = toSRGB $ toPure c
+          a = alphaChannel c
+          toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
+      Offset d j m ->
+        let join = case j of
+              Bevel -> namedArg "join_type" "bevel"
+              Round -> namedArg "join_type" "round"
+              Miter l -> namedArg "miter_limit" $ PP.pretty l
+        in renderTransform (renderOperator "offset" [namedArg "delta" $ PP.pretty d, join]) [m]
       Projection c m -> renderTransform (renderOperator "projection" [namedArg "cut" $ renderBool c]) [m]
       LinearExtrude h t sc sl c f m ->
         renderTransform
@@ -674,6 +681,11 @@ instance Vector v => PP.Pretty (Model v) where
               namedArg "convexity" (PP.pretty c) : facetsToArgs f
           )
           [m]
+      Difference m1 m2 -> renderTransform (renderOperator "difference" []) [m1,m2]
+      Union ms -> renderTransform (renderOperator "union" []) ms
+      Intersection ms -> renderTransform (renderOperator "intersection" []) ms
+      Minkowski ms -> renderTransform (renderOperator "minkowski" []) ms
+      Hull ms -> renderTransform (renderOperator "hull" []) ms
       Import f -> renderAction "import" [PP.pretty $ "\"" ++ f ++ "\""]
       Var facets ss ->
         renderTransform
@@ -690,50 +702,6 @@ instance Vector v => PP.Pretty (Model v) where
             . PP.indent 2
             . PP.vsep
             $ PP.pretty <$> ms
-
-instance Vector v => PP.Pretty (UnaryOp v) where
-  pretty = \case
-    Scale v -> renderOperator "scale" [PP.pretty $ rVector v]
-    Resize v -> renderOperator "resize" [PP.pretty $ rVector v]
-    Translate v -> renderOperator "translate" [PP.pretty $ rVector v]
-    Rotate2d v -> renderOperator "rotate" [PP.pretty $ rVector ((0, 0, v) :: Vector3d)]
-    Rotate3d v -> renderOperator "rotate" [PP.pretty $ rVector v]
-    Mirror v -> renderOperator "mirror" [PP.pretty $ rVector v]
-    MultMatrix (a, b, c, d) ->
-      let q2list (w, x, y, z) = [w, x, y, z]
-       in renderOperator
-            "multmatrix"
-            [PP.align . PP.list $ PP.list . fmap PP.pretty . q2list <$> [a, b, c, d]]
-    Color c ->
-      let r = toSRGB c
-       in renderOperator
-            "color"
-            [PP.pretty $ rVector (channelRed r, channelGreen r, channelBlue r)]
-    Transparent c ->
-      renderOperator
-        "color"
-        [PP.list $ PP.pretty <$> [channelRed r, channelGreen r, channelBlue r, a]]
-      where
-        r = toSRGB $ toPure c
-        a = alphaChannel c
-        toPure ac = if a > 0 then darken (recip a) (ac `over` black) else black
-    Offset d j ->
-      let join = case j of
-            Bevel -> namedArg "join_type" "bevel"
-            Round -> namedArg "join_type" "round"
-            Miter l -> namedArg "miter_limit" $ PP.pretty l
-       in renderOperator "offset" [namedArg "delta" $ PP.pretty d, join]
-
-instance Vector v => PP.Pretty (BinaryOp v) where
-  pretty = \case
-    Difference -> renderOperator "difference" []
-
-instance Vector v => PP.Pretty (ListOp v) where
-  pretty = \case
-    Union -> renderOperator "union" []
-    Intersection -> renderOperator "intersection" []
-    Minkowski -> renderOperator "minkowski" []
-    Hull -> renderOperator "hull" []
 
 instance PP.Pretty Shape where
   pretty = \case
@@ -849,7 +817,7 @@ draw = putStrLn . render
 -- | A convenience function to write a 'union' of 'Model's to
 -- standard output.
 drawL :: Vector v => [Model v] -> IO ()
-drawL = draw . ListOp Union
+drawL = draw . Union
 
 facetsToArgs :: Facets -> [PP.Doc ann]
 facetsToArgs (Facets fa' fs' fn') =
