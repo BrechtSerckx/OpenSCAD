@@ -28,5 +28,11 @@
         "repo": "https://github.com/NixOS/nixpkgs.git",
         "rev": "cf612375cd4317c7df0dee2985a21a10b3e75bcf",
         "type": "git"
+    },
+    "nixpkgs-act": {
+        "branch": "master",
+        "repo": "https://github.com/NixOS/nixpkgs.git",
+        "rev": "8540876319735c0891f25c8c7c9d8475159ae8fe",
+        "type": "git"
     }
 }

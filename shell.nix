@@ -15,7 +15,10 @@ in project.shellFor {
     ormolu = "0.1.4.1";
   };
 
-  buildInputs = with (import sources.nixpkgs { }); [ nixfmt ];
+  buildInputs = with (import sources.nixpkgs { }); [
+    nixfmt
+    (import sources.nixpkgs-act { }).act
+  ];
 
   crossPlatforms = ps:
     with ps;
