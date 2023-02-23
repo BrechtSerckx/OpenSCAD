@@ -8,10 +8,10 @@ in project.shellFor {
   withHoogle = true;
 
   tools = {
-    cabal = "3.2.0.0";
-    hlint = "3.2.8";
+    cabal = "3.6.2.0";
+    hlint = "3.5";
     ghcid = "0.8.7";
-    ormolu = "0.1.4.1";
+    ormolu = "0.5.0.1";
   };
 
   buildInputs = with pkgs; [
