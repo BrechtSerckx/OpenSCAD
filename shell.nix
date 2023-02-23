@@ -1,8 +1,7 @@
 let
   project = import ./default.nix;
+  pkgs = import ./nix/pkgs.nix;
   sources = import ./nix/sources.nix { };
-  haskellNix = import sources.haskellNix { };
-  pkgs = import haskellNix.sources.nixpkgs-unstable haskellNix.nixpkgsArgs;
 in project.shellFor {
   packages = ps: with ps; [ OpenSCAD ];
 
@@ -15,17 +14,10 @@ in project.shellFor {
     ormolu = "0.1.4.1";
   };
 
-  buildInputs = with (import sources.nixpkgs { }); [
+  buildInputs = with pkgs; [
     nixfmt
     (import sources.nixpkgs-act { }).act
   ];
-
-  crossPlatforms = ps:
-    with ps;
-    [
-      # ghcjs      
-      # mingwW64 
-    ];
 
   exactDeps = true;
 }
