@@ -1,31 +1,25 @@
 let
   project = import ./default.nix;
+  pkgs = import ./nix/pkgs.nix;
   sources = import ./nix/sources.nix { };
-  haskellNix = import sources.haskellNix { };
-  pkgs = import haskellNix.sources.nixpkgs-unstable haskellNix.nixpkgsArgs;
 in project.shellFor {
   packages = ps: with ps; [ OpenSCAD ];
 
   withHoogle = true;
 
   tools = {
-    cabal = "3.2.0.0";
-    hlint = "3.2.8";
+    cabal = "3.6.2.0";
+    hlint = "3.5";
     ghcid = "0.8.7";
-    ormolu = "0.1.4.1";
+    ormolu = "0.5.0.1";
+    haskell-ci = "0.14.3";
+    haskell-language-server = "1.9.1.0";
   };
 
-  buildInputs = with (import sources.nixpkgs { }); [
+  buildInputs = with pkgs; [
     nixfmt
     (import sources.nixpkgs-act { }).act
   ];
-
-  crossPlatforms = ps:
-    with ps;
-    [
-      # ghcjs      
-      # mingwW64 
-    ];
 
   exactDeps = true;
 }

@@ -253,13 +253,11 @@ instance Vector Vector3d where
 
 -- Coplanar only makes sense for R3, so it's not part of the Vector class
 coplanar :: [Vector3d] -> Bool
-coplanar vs
-  | length vs <= 3 = True -- by definition
+coplanar vs@(v1 : v2 : v3 : vs') 
   | collinear $ take 3 vs = coplanar $ tail vs
   | otherwise =
     all (\v -> (v3 #- v1) #. ((v2 #- v1) #* (v #- v3)) == 0) vs'
-  where
-    (v1 : v2 : v3 : vs') = vs
+coplanar _ = True -- by definition
 
 -- | A 4x4 transformation matrix specifying a complete 3-space
 -- transform of a 'Model3d'.

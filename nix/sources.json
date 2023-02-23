@@ -5,10 +5,10 @@
         "homepage": "https://input-output-hk.github.io/haskell.nix",
         "owner": "input-output-hk",
         "repo": "haskell.nix",
-        "rev": "f0308ed1df3ce9f10f9da1a7c0c8591921d0b4e5",
-        "sha256": "0l18pvb4pdf5r6871kg3xxklinskjmqdasyaqgfsxhxjlq3anb0j",
+        "rev": "9bc8625f18ed1aa633f5f3a52ee03d1718eaeebe",
+        "sha256": "0mm4z0wc7vic1185id912lfmrm2vy8ky25qa2ivf8fphi4ls5qb8",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/haskell.nix/archive/f0308ed1df3ce9f10f9da1a7c0c8591921d0b4e5.tar.gz",
+        "url": "https://github.com/input-output-hk/haskell.nix/archive/9bc8625f18ed1aa633f5f3a52ee03d1718eaeebe.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "niv": {
@@ -32,7 +32,7 @@
     "nixpkgs-act": {
         "branch": "master",
         "repo": "https://github.com/NixOS/nixpkgs.git",
-        "rev": "8540876319735c0891f25c8c7c9d8475159ae8fe",
+        "rev": "129b6f78121802d18d215c9f9e04d7971c58ea0c",
         "type": "git"
     }
 }
