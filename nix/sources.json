@@ -32,7 +32,7 @@
     "nixpkgs-act": {
         "branch": "master",
         "repo": "https://github.com/NixOS/nixpkgs.git",
-        "rev": "8540876319735c0891f25c8c7c9d8475159ae8fe",
+        "rev": "129b6f78121802d18d215c9f9e04d7971c58ea0c",
         "type": "git"
     }
 }
