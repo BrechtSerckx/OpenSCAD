@@ -12,6 +12,7 @@ in project.shellFor {
     hlint = "3.5";
     ghcid = "0.8.7";
     ormolu = "0.5.0.1";
+    haskell-ci = "0.14.3";
   };
 
   buildInputs = with pkgs; [
