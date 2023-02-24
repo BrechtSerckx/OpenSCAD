@@ -20,5 +20,4 @@ jobs:
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
     - run: make nix-build
     - run: nix-shell --run "echo 'Shell ok'"
-    - run: nix-shell --run "make format-check"
-    - run: nix-shell --run "make hlint"
+    - run: nix-shell --run "make check"
