@@ -20,6 +20,8 @@ in project.shellFor {
   buildInputs = with pkgs; [
     nixfmt
     (import sources.nixpkgs-act { }).act
+    cmake
+    bash
   ];
 
   exactDeps = true;
