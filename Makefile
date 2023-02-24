@@ -2,7 +2,7 @@ SHELL := /usr/bin/env bash
 
 .PHONY: clean
 clean:
-	rm -rf dist-newstyle result result-*
+	rm -rf dist-newstyle result result-* bench/out/*
 
 .PHONY: build
 build:
