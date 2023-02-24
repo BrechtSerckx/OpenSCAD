@@ -35,3 +35,7 @@ hlint:
 .PHONY: ci-cd
 ci-cd: 
 	act $(ACT_ARGS)
+
+.PHONY: make check
+check: format-check hlint
+	cabal check

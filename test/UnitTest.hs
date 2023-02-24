@@ -1,5 +1,3 @@
-#!/usr/bin/env runghc
-
 module Main where
 
 import Control.DeepSeq
