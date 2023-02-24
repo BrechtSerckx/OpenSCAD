@@ -198,8 +198,8 @@ import qualified Data.Char as Char
 import Data.Colour (AlphaColour, Colour, alphaChannel, darken, over)
 import Data.Colour.Names as Colours
 import Data.Colour.SRGB (channelBlue, channelGreen, channelRed, toSRGB)
-import Data.List (elemIndices, nub)
 import Data.LanguageCodes (ISO639_1)
+import Data.List (elemIndices, nub)
 import Data.Maybe (catMaybes)
 import qualified Data.Set as Set
 import Prettyprinter ((<+>))
@@ -253,10 +253,10 @@ instance Vector Vector3d where
 
 -- Coplanar only makes sense for R3, so it's not part of the Vector class
 coplanar :: [Vector3d] -> Bool
-coplanar vs@(v1 : v2 : v3 : vs') 
+coplanar vs@(v1 : v2 : v3 : vs')
   | collinear $ take 3 vs = coplanar $ tail vs
   | otherwise =
-    all (\v -> (v3 #- v1) #. ((v2 #- v1) #* (v #- v3)) == 0) vs'
+      all (\v -> (v3 #- v1) #. ((v2 #- v1) #* (v #- v3)) == 0) vs'
 coplanar _ = True -- by definition
 
 -- | A 4x4 transformation matrix specifying a complete 3-space
@@ -422,9 +422,9 @@ polygon convexity paths
   | any ((< 3) . length) paths = error "Polygon has fewer than 3 points."
   | any collinear paths = error "Points in polygon are collinear."
   | otherwise =
-    let points = nub $ concat paths
-     in Shape . Polygon convexity points $
-          map (concatMap (`elemIndices` points)) paths
+      let points = nub $ concat paths
+       in Shape . Polygon convexity points $
+            map (concatMap (`elemIndices` points)) paths
 
 -- | This provides direct access to the OpenScad @polygon@ command for
 -- performance reasons. This version uses the OpenSCAD arguments:
@@ -436,7 +436,7 @@ unsafePolygon convexity points paths = Shape $ Polygon convexity points paths
 
 -- | 'offset' a 'Model2d's edges by @offset /delta join/@.
 offset :: Double -> Join -> Model2d -> Model2d
-offset = Offset 
+offset = Offset
 
 -- Tools for creating Model3ds
 
@@ -482,10 +482,10 @@ polyhedron convexity paths
   | any collinear paths = error "Some face has collinear points."
   | (not . all coplanar) paths = error "Some face isn't coplanar."
   | length vectors /= length (nub vectors) =
-    error "Some faces have different orientation."
+      error "Some faces have different orientation."
   | 2 * length edges /= length vectors = error "Some edges are not in two faces."
   | xCross headMax xMax tailMax > 0 =
-    error "Face orientations are counterclockwise."
+      error "Face orientations are counterclockwise."
   | otherwise = Solid . Polyhedron convexity points $ sides sidesIn
   where
     vectors = concatMap (\p -> zip p (tail p ++ [head p])) paths
@@ -558,40 +558,40 @@ importFile = Import
 
 -- | Scale a 'Model', the vector specifying the scale factor for each axis.
 scale :: Vector v => v -> Model v -> Model v
-scale = Scale 
+scale = Scale
 
 -- | Resize a 'Model' to occupy the dimensions given by the vector. Note that
 -- this does nothing prior to the 2014 versions of OpenSCAD.
 resize :: Vector v => v -> Model v -> Model v
-resize = Resize 
+resize = Resize
 
 -- | Rotate a 'Model' around the z-axis
 rotate2d :: Double -> Model2d -> Model2d
-rotate2d = Rotate2d 
+rotate2d = Rotate2d
 
 -- | Rotate a 'Model' by different amounts around each of the three axis.
 rotate3d :: Vector3d -> Model3d -> Model3d
-rotate3d = Rotate3d 
+rotate3d = Rotate3d
 
 -- | Translate a 'Model' along a 'Vector'.
 translate :: Vector v => v -> Model v -> Model v
-translate = Translate 
+translate = Translate
 
 -- | Mirror a 'Model' across a plane intersecting the origin.
 mirror :: Vector v => v -> Model v -> Model v
-mirror = Mirror 
+mirror = Mirror
 
 -- | Render a 'Model' in a specific color. This doesn't use the
 -- OpenSCAD color model, but instead uses the 'Data.Colour' model. The
 -- 'Graphics.OpenSCAD' module rexports 'Data.Colour.Names' so you can
 -- conveniently say @'color' 'red' /'Model'/@.
 color :: Vector v => Colour Double -> Model v -> Model v
-color = Color 
+color = Color
 
 -- | Render a 'Model' in a transparent color. This uses the
 -- 'Data.Colour.AlphaColour' color model.
 transparent :: Vector v => AlphaColour Double -> Model v -> Model v
-transparent = Transparent 
+transparent = Transparent
 
 -- | A 'translate' that just goes up, since those seem to be common.
 up :: Double -> Model3d -> Model3d
@@ -637,18 +637,27 @@ instance Vector v => PP.Pretty (Model v) where
       Mirror v m -> renderTransform (renderOperator "mirror" [PP.pretty $ rVector v]) [m]
       MultMatrix (a, b, c, d) m ->
         let q2list (w, x, y, z) = [w, x, y, z]
-        in renderTransform (renderOperator
-              "multmatrix"
-              [PP.align . PP.list $ PP.list . fmap PP.pretty . q2list <$> [a, b, c, d]]) [m]
+         in renderTransform
+              ( renderOperator
+                  "multmatrix"
+                  [PP.align . PP.list $ PP.list . fmap PP.pretty . q2list <$> [a, b, c, d]]
+              )
+              [m]
       Color c m ->
         let r = toSRGB c
-        in renderTransform (renderOperator
-              "color"
-              [PP.pretty $ rVector (channelRed r, channelGreen r, channelBlue r)]) [m]
+         in renderTransform
+              ( renderOperator
+                  "color"
+                  [PP.pretty $ rVector (channelRed r, channelGreen r, channelBlue r)]
+              )
+              [m]
       Transparent c m ->
-        renderTransform (renderOperator
-          "color"
-          [PP.list $ PP.pretty <$> [channelRed r, channelGreen r, channelBlue r, a]]) [m]
+        renderTransform
+          ( renderOperator
+              "color"
+              [PP.list $ PP.pretty <$> [channelRed r, channelGreen r, channelBlue r, a]]
+          )
+          [m]
         where
           r = toSRGB $ toPure c
           a = alphaChannel c
@@ -658,7 +667,7 @@ instance Vector v => PP.Pretty (Model v) where
               Bevel -> namedArg "join_type" "bevel"
               Round -> namedArg "join_type" "round"
               Miter l -> namedArg "miter_limit" $ PP.pretty l
-        in renderTransform (renderOperator "offset" [namedArg "delta" $ PP.pretty d, join]) [m]
+         in renderTransform (renderOperator "offset" [namedArg "delta" $ PP.pretty d, join]) [m]
       Projection c m -> renderTransform (renderOperator "projection" [namedArg "cut" $ renderBool c]) [m]
       LinearExtrude h t sc sl c f m ->
         renderTransform
@@ -679,7 +688,7 @@ instance Vector v => PP.Pretty (Model v) where
               namedArg "convexity" (PP.pretty c) : facetsToArgs f
           )
           [m]
-      Difference m1 m2 -> renderTransform (renderOperator "difference" []) [m1,m2]
+      Difference m1 m2 -> renderTransform (renderOperator "difference" []) [m1, m2]
       Union ms -> renderTransform (renderOperator "union" []) ms
       Intersection ms -> renderTransform (renderOperator "intersection" []) ms
       Minkowski ms -> renderTransform (renderOperator "minkowski" []) ms

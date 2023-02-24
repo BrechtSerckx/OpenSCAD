@@ -6,5 +6,6 @@ in pkgs.haskell-nix.project {
     name = "OpenSCAD";
     src = ./.;
   };
-  modules = [{ packages.OpenSCAD.components.library.ghcOptions = [ "-Werror"];}];
+  modules =
+    [{ packages.OpenSCAD.components.library.ghcOptions = [ "-Werror" ]; }];
 }

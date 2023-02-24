@@ -18,6 +18,7 @@ jobs:
       with:
         name: brechtserckx-openscad
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-    - run: nix-build --no-out-link
-    - run: nix-shell --run "echo OK"
-    - run: nix-shell --run "hlint src test"
+    - run: make nix-build
+    - run: nix-shell --run "echo 'Shell ok'"
+    - run: nix-shell --run "make format-check"
+    - run: nix-shell --run "make hlint"
