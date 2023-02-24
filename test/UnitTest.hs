@@ -16,11 +16,11 @@ assertError err code = do
     Left (ErrorCall e) | e == err -> pure ()
     Left e
       | otherwise ->
-        assertFailure $
-          "Received unexpected exception: "
-            ++ show e
-            ++ "\ninstead of exception: "
-            ++ show err
+          assertFailure $
+            "Received unexpected exception: "
+              ++ show e
+              ++ "\ninstead of exception: "
+              ++ show err
     Right _ -> assertFailure $ "Received no exception, but was expecting exception: " ++ show err
 
 sw = concat . words
