@@ -14,6 +14,7 @@ in project.shellFor {
     ormolu = "0.5.0.1";
     haskell-ci = "0.14.3";
     haskell-language-server = "1.9.1.0";
+    cabal-fmt = "0.1.6";
   };
 
   buildInputs = with pkgs; [
