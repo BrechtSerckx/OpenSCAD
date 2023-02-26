@@ -73,9 +73,9 @@ benchmark OpenSCAD-bench
   type:             exitcode-stdio-1.0
   main-is:          Bench.hs
   build-depends:
-      base         >=4.5.0 && <5.0
-    , OpenSCAD
+      base       >=4.5.0 && <5.0
     , criterion
+    , OpenSCAD
     , process
 
   hs-source-dirs:   bench
