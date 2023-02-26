@@ -12,6 +12,10 @@ build:
 test:
 	cabal test OpenSCAD
 
+.PHONY: bench
+test:
+	cabal bench
+
 .PHONY: nix-build
 nix-build:
 	nix-build --no-out-link default.nix -A OpenSCAD.components
