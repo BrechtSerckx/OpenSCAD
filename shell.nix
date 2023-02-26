@@ -22,6 +22,7 @@ in project.shellFor {
     (import sources.nixpkgs-act { }).act
     cmake
     bash
+    openscad
   ];
 
   exactDeps = true;

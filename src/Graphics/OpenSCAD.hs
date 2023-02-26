@@ -107,7 +107,7 @@ module Graphics.OpenSCAD
 
     -- number of dimensions it has.
     Model,
-    Vector,
+    Vector (..),
 
     -- ** Types aliases with fixed dimensions
     Model2d,

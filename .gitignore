@@ -4,3 +4,4 @@ dist-newstyle
 .direnv
 /cabal.project.local
 /.secrets
+/bench/out/
