@@ -23,6 +23,7 @@ assertError err code = do
 
 sw = concat . words
 
+st :: (HasCallStack, Vector v) => TestName -> String -> Model v -> TestTree
 st n e a = testCase n $ sw (render a) @?= sw e
 
 {- About the test result values.
@@ -44,7 +45,7 @@ tests =
         [ testGroup
             "Spheres"
             [ st "1" "sphere(1.0);" $ sphere 1 def,
-              st "2" "sphere(2.0,$fn=100);" (sphere 2 $ fn 100),
+              st "2" "sphere(2.0,$fn=100.0);" (sphere 2 $ fn 100),
               st "3" "sphere(2.0,$fa=5.0);" (sphere 2 $ fa 5),
               st "4" "sphere(2.0,$fs=0.1);" (sphere 2 $ fs 0.1)
             ],
@@ -57,7 +58,7 @@ tests =
             "Cylinders"
             [ st "1" "cylinder(r=1.0,h=2.0);" $ cylinder 1 2 def,
               st "2" "cylinder(r=1.0,h=2.0,$fs=0.6);" (cylinder 1 2 $ fs 0.6),
-              st "3" "cylinder(r=1.0,h=2.0,$fn=10);" (cylinder 1 2 $ fn 10),
+              st "3" "cylinder(r=1.0,h=2.0,$fn=10.0);" (cylinder 1 2 $ fn 10),
               st "4" "cylinder(r=1.0,h=2.0,$fa=30.0);" (cylinder 1 2 $ fa 30)
             ],
           testGroup
@@ -69,7 +70,7 @@ tests =
                 (obCylinder 1 2 2 $ fs 0.6),
               st
                 "3"
-                "cylinder(r1=1.0,h=2.0,r2=2.0,$fn=10);"
+                "cylinder(r1=1.0,h=2.0,r2=2.0,$fn=10.0);"
                 (obCylinder 1 2 2 $ fn 10),
               st
                 "4"
@@ -81,7 +82,7 @@ tests =
             [ st "import" "import(\"test.stl\");" (importFile "test.stl" :: Model3d),
               st
                 "polyhedron 1"
-                "polyhedron(points=[[10.0,10.0,0.0],[10.0,-10.0,0.0],[0.0,0.0,10.0],[-10.0,-10.0,0.0],[-10.0,10.0,0.0]],triangles=[[0,1,2],[1,3,2],[3,4,2],[4,0,2],[1,0,4],[3,1,4]],convexity=1);"
+                "polyhedron(points=[[10.0,10.0,0.0],[10.0,-10.0,0.0],[0.0,0.0,10.0],[-10.0,-10.0,0.0],[-10.0,10.0,0.0]],triangles=[[0.0,1.0,2.0],[1.0,3.0,2.0],[3.0,4.0,2.0],[4.0,0.0,2.0],[1.0,0.0,4.0],[3.0,1.0,4.0]],convexity=1.0);"
                 $ polyhedron
                   1
                   [ [(10, 10, 0), (10, -10, 0), (0, 0, 10)],
@@ -93,7 +94,7 @@ tests =
                   ],
               st
                 "polyhedron 2"
-                "polyhedron(points=[[10.0,10.0,0.0],[10.0,-10.0,0.0],[0.0,0.0,10.0],[-10.0,-10.0,0.0],[-10.0,10.0,0.0]],faces=[[0,1,2],[1,3,2],[3,4,2],[4,0,2],[4,3,1,0]],convexity=1);"
+                "polyhedron(points=[[10.0,10.0,0.0],[10.0,-10.0,0.0],[0.0,0.0,10.0],[-10.0,-10.0,0.0],[-10.0,10.0,0.0]],faces=[[0.0,1.0,2.0],[1.0,3.0,2.0],[3.0,4.0,2.0],[4.0,0.0,2.0],[4.0,3.0,1.0,0.0]],convexity=1.0);"
                 $ polyhedron
                   1
                   [ [(10, 10, 0), (10, -10, 0), (0, 0, 10)],
@@ -104,7 +105,7 @@ tests =
                   ],
               st
                 "unsafePolyhedron"
-                "polyhedron(points=[[10.0,10.0,0.0],[10.0,-10.0,0.0],[-10.0,-10.0,0.0],[-10.0,10.0,0.0],[0.0,0.0,10.0]],faces=[[0,1,4],[1,2,4],[2,3,4],[3,0,4],[1,0,3],[2,1,3]],convexity=1);"
+                "polyhedron(points=[[10.0,10.0,0.0],[10.0,-10.0,0.0],[-10.0,-10.0,0.0],[-10.0,10.0,0.0],[0.0,0.0,10.0]],faces=[[0.0,1.0,4.0],[1.0,2.0,4.0],[2.0,3.0,4.0],[3.0,0.0,4.0],[1.0,0.0,3.0],[2.0,1.0,3.0]],convexity=1.0);"
                 ( unsafePolyhedron
                     1
                     [ (10.0, 10.0, 0.0),
@@ -127,43 +128,43 @@ tests =
             "Linear-Extrusion"
             [ st
                 "1"
-                "linear_extrude(height=10.0,twist=0.0,scale=[1.0,1.0],slices=10,convexity=10)circle(1.0);"
+                "linear_extrude(height=10.0,twist=0.0,scale=[1.0,1.0],slices=10.0,convexity=10.0)circle(1.0);"
                 (linearExtrude 10 0 (1, 1) 10 10 def $ circle 1 def),
               st
                 "2"
-                "linear_extrude(height=10.0,twist=100.0,scale=[1.0,1.0],slices=10,convexity=10)translate([2.0,0.0])circle(1.0);"
+                "linear_extrude(height=10.0,twist=100.0,scale=[1.0,1.0],slices=10.0,convexity=10.0)translate([2.0,0.0])circle(1.0);"
                 ( linearExtrude 10 100 (1, 1) 10 10 def $
                     translate (2, 0) $
                       circle 1 def
                 ),
               st
                 "3"
-                "linear_extrude(height=10.0,twist=500.0,scale=[1.0,1.0],slices=10,convexity=10)translate([2.0,0.0])circle(1.0);"
+                "linear_extrude(height=10.0,twist=500.0,scale=[1.0,1.0],slices=10.0,convexity=10.0)translate([2.0,0.0])circle(1.0);"
                 ( linearExtrude 10 500 (1, 1) 10 10 def $
                     translate (2, 0) $
                       circle 1 def
                 ),
               st
                 "4"
-                "linear_extrude(height=10.0,twist=360.0,scale=[1.0,1.0],slices=100,convexity=10)translate([2.0,0.0])circle(1.0);"
+                "linear_extrude(height=10.0,twist=360.0,scale=[1.0,1.0],slices=100.0,convexity=10.0)translate([2.0,0.0])circle(1.0);"
                 ( linearExtrude 10 360 (1, 1) 100 10 def $
                     translate (2, 0) $
                       circle 1 def
                 ),
               st
                 "5"
-                "linear_extrude(height=10.0,twist=360.0,scale=[1.0,1.0],slices=100,convexity=10,$fn=100)translate([2.0,0.0])circle(1.0);"
+                "linear_extrude(height=10.0,twist=360.0,scale=[1.0,1.0],slices=100.0,convexity=10.0,$fn=100.0)translate([2.0,0.0])circle(1.0);"
                 ( linearExtrude 10 360 (1, 1) 100 10 (fn 100) $
                     translate (2, 0) $
                       circle 1 def
                 ),
               st
                 "6"
-                "linear_extrude(height=10.0,twist=0.0,scale=[3.0,3.0],slices=100,convexity=10)translate([2.0,0.0])circle(1.0);"
+                "linear_extrude(height=10.0,twist=0.0,scale=[3.0,3.0],slices=100.0,convexity=10.0)translate([2.0,0.0])circle(1.0);"
                 (linearExtrude 10 0 (3, 3) 100 10 def $ translate (2, 0) $ circle 1 def),
               st
                 "7"
-                "linear_extrude(height=10.0,twist=0.0,scale=[1.0,5.0],slices=100,convexity=10,$fn=100)translate([2.0,0.0])circle(1.0);"
+                "linear_extrude(height=10.0,twist=0.0,scale=[1.0,5.0],slices=100.0,convexity=10.0,$fn=100.0)translate([2.0,0.0])circle(1.0);"
                 ( linearExtrude 10 0 (1, 5) 100 10 (fn 100) $
                     translate (2, 0) $
                       circle 1 def
@@ -173,18 +174,18 @@ tests =
             "Rotated-Extrusion"
             [ st
                 "1"
-                "rotate_extrude(convexity=10)translate([2.0,0.0])circle(1.0);"
+                "rotate_extrude(convexity=10.0)translate([2.0,0.0])circle(1.0);"
                 (rotateExtrude 10 def $ translate (2, 0) $ circle 1 def),
               st
                 "2"
-                "rotate_extrude(convexity=10,$fn=100)translate([2.0,0.0])circle(1.0,$fn=100);"
+                "rotate_extrude(convexity=10.0,$fn=100.0)translate([2.0,0.0])circle(1.0,$fn=100.0);"
                 (rotateExtrude 10 (fn 100) $ translate (2, 0) $ circle 1 $ fn 100)
             ],
           testGroup
             "Surface"
-            [ st "Normal" "surface(file=\"test.dat\",invert=false,convexity=5);" $
+            [ st "Normal" "surface(file=\"test.dat\",invert=false,convexity=5.0);" $
                 surface "test.dat" False 5,
-              st "Inverted" "surface(file=\"test.dat\",invert=true,convexity=5);" $
+              st "Inverted" "surface(file=\"test.dat\",invert=true,convexity=5.0);" $
                 surface "test.dat" True 5 -- Requires  2014.QX
             ]
         ],
@@ -198,14 +199,14 @@ tests =
           testGroup
             "Circles"
             [ st "1" "circle(1.0);" $ circle 1 def,
-              st "2" "circle(2.0,$fn=100);" (circle 2 $ fn 100),
+              st "2" "circle(2.0,$fn=100.0);" (circle 2 $ fn 100),
               st "3" "circle(2.0,$fa=5.0);" (circle 2 $ fa 5),
               st "4" "circle(2.0,$fs=0.1);" (circle 2 $ fs 0.1)
             ],
           testGroup
             "Text"
             [ st "1" "text(text=\"foo\");" $ text "foo" defTextConfig,
-              st "2" "text(text=\"bar\",size=14.0,font=\"Fira Code\",halign=\"right\",valign=\"top\",spacing=2.0,direction=\"ttb\",language=\"fr\",script=\"foobar\",$fn=5);" $
+              st "2" "text(text=\"bar\",size=14.0,font=\"Fira Code\",halign=\"right\",valign=\"top\",spacing=2.0,direction=\"ttb\",language=\"fr\",script=\"foobar\",$fn=5.0);" $
                 text
                   "bar"
                   ( TextConfig
@@ -226,11 +227,11 @@ tests =
             [ st "import" "import(\"test.dxf\");" (importFile "test.dxf" :: Model3d),
               st
                 "polygon"
-                "polygon(points=[[0.0,0.0],[100.0,0.0],[0.0,100.0],[10.0,10.0],[80.0,10.0],[10.0,80.0]],paths=[[0,1,2],[3,4,5]],convexity=10);"
+                "polygon(points=[[0.0,0.0],[100.0,0.0],[0.0,100.0],[10.0,10.0],[80.0,10.0],[10.0,80.0]],paths=[[0.0,1.0,2.0],[3.0,4.0,5.0]],convexity=10.0);"
                 $ polygon 10 [[(0, 0), (100, 0), (0, 100)], [(10, 10), (80, 10), (10, 80)]],
               st
                 "unsafePolygon"
-                "polygon(points=[[0.0,0.0],[100.0,0.0],[0.0,100.0],[10.0,10.0],[80.0,10.0],[10.0,80.0]], paths=[[0,1,2],[3,4,5]],convexity=1);"
+                "polygon(points=[[0.0,0.0],[100.0,0.0],[0.0,100.0],[10.0,10.0],[80.0,10.0],[10.0,80.0]], paths=[[0.0,1.0,2.0],[3.0,4.0,5.0]],convexity=1.0);"
                 ( unsafePolygon
                     1
                     [(0, 0), (100, 0), (0, 100), (10, 10), (80, 10), (10, 80)]
@@ -343,7 +344,7 @@ tests =
         "Facets"
         [ st
             "facet 1"
-            "let($fn=100) sphere(2.0,$fn=100);"
+            "let($fn=100.0) sphere(2.0,$fn=100.0);"
             (var (fn 100) [sphere 2 $ fn 100]),
           st
             "facet 2"
@@ -423,7 +424,7 @@ tests =
             (intersection [cube 1, sphere 1.1 $ fs 0.1]),
           st
             "minkowski"
-            "minkowski(){cube([10.0,10.0,10.0]);cylinder(r=2.0,h=1.1,$fn=50);}"
+            "minkowski(){cube([10.0,10.0,10.0]);cylinder(r=2.0,h=1.1,$fn=50.0);}"
             (minkowski [cube 10, cylinder 2 1.1 $ fn 50]),
           st
             "hull"
