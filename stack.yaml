@@ -1,5 +1,10 @@
 flags: {}
 packages:
 - '.'
-extra-deps: []
 resolver: lts-20.11
+
+extra-deps: 
+  - git: https://github.com/BrechtSerckx/language-openscad
+    commit: fadaad24ed6bfdd00309d43483d27384d4d089d6
+    # See note [nix-sha256].
+    # nix-sha256: sha256:jFrur7leDGRjiWEY5ikvjsbOe3Ou6am8Eb+w93qWBd4=
