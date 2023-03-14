@@ -13,7 +13,7 @@ test:
 	cabal test OpenSCAD
 
 .PHONY: bench
-test:
+bench:
 	cabal bench
 
 .PHONY: nix-build
@@ -40,6 +40,6 @@ hlint:
 ci-cd: 
 	act $(ACT_ARGS)
 
-.PHONY: make check
+.PHONY: check
 check: format-check hlint
 	cabal check
