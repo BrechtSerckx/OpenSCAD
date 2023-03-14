@@ -47,3 +47,7 @@ check: format-check hlint
 .PHONY: haddock
 haddock: 
 	cabal haddock
+
+.PHONY: doctest
+doctest: 
+	doctest
