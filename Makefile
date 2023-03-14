@@ -1,5 +1,13 @@
 SHELL := /usr/bin/env bash
 
+ifdef PACKAGE_SET
+	NIX_ARGS += --argstr packageSet $(PACKAGE_SET)
+endif
+
+.PHONY: info
+info:
+	echo "NIX_ARGS: '$(NIX_ARGS)'"
+
 .PHONY: clean
 clean:
 	rm -rf dist-newstyle result result-* bench/out/*
@@ -18,7 +26,7 @@ bench:
 
 .PHONY: nix-build
 nix-build:
-	nix-build --no-out-link default.nix -A OpenSCAD.components
+	nix-build $(NIX_ARGS) --no-out-link default.nix -A OpenSCAD.components
 
 .PHONY: format
 format:
