@@ -4,9 +4,14 @@ on:
   push:
     branches: [master]
 jobs:
-  Nix-CI:
-    name: 
+
+  # Nix builds
+  Nix-Build:
     runs-on: ubuntu-latest
+    # Build for 3 latest Stackage package sets
+    strategy:
+      matrix:
+        package-set: [lts-20, lts-19, lts-18]
     steps:
     - uses: actions/checkout@v3
     - uses: cachix/install-nix-action@v17
@@ -18,6 +23,27 @@ jobs:
       with:
         name: brechtserckx-openscad
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-    - run: make nix-build
-    - run: nix-shell --run "echo 'Shell ok'"
+
+    # Nix build
+    - run: make nix-build PACKAGE_SET=${{matrix.package-set}}
+
+    # Cabal build in nix-shell
+    - run: nix-shell --argstr packageSet ${{matrix.package-set}} --run "make build"
+
+  # Additional package checking using nix
+  Nix-Check:
+    runs-on: ubuntu-latest
+    # Only run after build completed, to re-use caching
+    needs: Nix-Build
+    steps:
+    - uses: actions/checkout@v3
+    - uses: cachix/install-nix-action@v17
+      with:
+        extra_nix_config: |
+          trusted-public-keys = hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+          substituters = https://hydra.iohk.io https://cache.nixos.org/
+    - uses: cachix/cachix-action@v10
+      with:
+        name: brechtserckx-openscad
+        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
     - run: nix-shell --run "make check"
