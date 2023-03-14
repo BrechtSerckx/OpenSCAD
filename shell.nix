@@ -23,6 +23,8 @@ in project.shellFor {
     cmake
     bash
     openscad
+    # not available from haskell.nix?
+    pkgs.haskellPackages.doctest
   ];
 
   exactDeps = true;
