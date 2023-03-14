@@ -43,3 +43,7 @@ ci-cd:
 .PHONY: check
 check: format-check hlint
 	cabal check
+
+.PHONY: haddock
+haddock: 
+	cabal haddock
