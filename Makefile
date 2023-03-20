@@ -1,4 +1,5 @@
 SHELL := /usr/bin/env bash
+PROJECT := OpenSCAD
 
 .PHONY: clean
 clean:
@@ -6,11 +7,11 @@ clean:
 
 .PHONY: build
 build:
-	cabal build OpenSCAD
+	cabal build $(PROJECT)
 
 .PHONY: test
 test:
-	cabal test OpenSCAD
+	cabal test $(PROJECT)
 
 .PHONY: nix-build
 nix-build:
@@ -20,13 +21,13 @@ nix-build:
 format:
 	find src test -type f -name '*.hs' -exec ormolu --mode inplace {} \+
 	find -type f -name '*.nix' -and -not -path './nix/sources.nix' -exec nixfmt {} \+
-	cabal-fmt --inplace OpenSCAD.cabal
+	cabal-fmt --inplace $(PROJECT).cabal
 
 .PHONY: format-check
 format-check:
 	find src test -type f -name '*.hs' -exec ormolu --mode check {} \+
 	find -type f -name '*.nix' -and -not -path './nix/sources.nix' -exec nixfmt --check {} \+
-	cabal-fmt --check OpenSCAD.cabal
+	cabal-fmt --check $(PROJECT).cabal
 
 .PHONY: hlint
 hlint:
